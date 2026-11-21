@@ -1,6 +1,6 @@
 {
   "version": "2.2.0",
-  "generatedAt": "2026-11-21T18:34:23.546Z",
+  "generatedAt": "2026-11-21T21:59:41.447Z",
   "algorithm": "SHA-256",
   "shellSha256": "aabea59b879e6876d4ac093d18e290f0cc92cc0733ac4ef74529d0b3004d00d7",
   "fileCount": 43,
@@ -19,7 +19,7 @@
     "icons/pwa-maskable-512x512.png": "72563c95e851efbcca4b0220e9c86d2de69830585a8a77ee6bc6b2773bf32358",
     "icons/apple-touch-icon.png": "2819a746dea23108be9be9983c891fea13190f22775f783b9d743f4348d112f8",
     "src/file-check.js": "ba14c2156f5e46cd5d46a44fab6d1d921a7314c898820741d3899c98c5ff3436",
-    "src/main.js": "f57a683b6229e6ffa9b6fb19908e0c309734be8c37bef66427117208dbd640bd",
+    "src/main.js": "21c9199d6f84ff5f714b64a225438eb1ed8874cf9897728de6965c69908d1513",
     "src/i18n/strings.js": "efa4f802d52ce6dc3e555e40971f4678f457d4be818a21c8bd279a764f24d0a2",
     "src/crypto/utils.js": "eb4839df8bb24a7ab479dff54829b3825077c93ab033038c550998db42513715",
     "src/crypto/argon2id-pure.js": "800d2a26bf2d215498579a50f30b5e5c55c1deb69a4bf1d07190e06e5831f828",

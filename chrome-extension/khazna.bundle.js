@@ -11097,7 +11097,7 @@ ${d.password}`;
     return typeof window !== "undefined" && window.location?.protocol === "chrome-extension:";
   }
   function canDownloadZip() {
-    return !isCapacitorAndroid() && !isStandaloneFile() && !isChromeExtension();
+    return false;
   }
   var storage = new VaultStorage();
   var session = new VaultSession({ storage });

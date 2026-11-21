@@ -4,5 +4,5 @@ Thumbs.db
 *.log
 .vscode/
 .idea/
-
-dist/*.apk
+dist/
+khazna-pwa.zip

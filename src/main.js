@@ -41,7 +41,7 @@ function isChromeExtension() {
 }
 
 function canDownloadZip() {
-  return !isCapacitorAndroid() && !isStandaloneFile() && !isChromeExtension();
+  return false;
 }
 
 const storage = new VaultStorage();
