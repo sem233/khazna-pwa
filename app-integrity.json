@@ -1,6 +1,6 @@
 {
   "version": "2.2.0",
-  "generatedAt": "2026-11-21T18:33:39.916Z",
+  "generatedAt": "2026-11-21T18:34:23.546Z",
   "algorithm": "SHA-256",
   "shellSha256": "aabea59b879e6876d4ac093d18e290f0cc92cc0733ac4ef74529d0b3004d00d7",
   "fileCount": 43,
@@ -26,7 +26,7 @@
     "src/crypto/kdf.js": "8e68c7f24bb45248a7499d4cab6233879ff2b5c33bb82e41e45888ff8b770f65",
     "src/crypto/kdf-worker.js": "8a23c0fc1d49e65d240813840cd87462737145c48370f235fe68cdf0761c9f55",
     "src/crypto/vault-crypto.js": "7603aa29aad7cc494f50d8ad4a1f797b598a4b87140b3e47d118f167c7faf5ff",
-    "src/storage/idb.js": "387730fda1d3521b1077dc95ecae26b3bb88b422656c903c65f6cd14e47e5944",
+    "src/storage/idb.js": "41d03a99fbb61bea50f8306bd73a7a016ef4ae4d66236b28dddb43ade4127529",
     "src/auth/webauthn.js": "44d8a71ba6b1edae28f8e0e54f2858fbd434f3b4910341b0f093acaf2dac9dbd",
     "src/auth/session.js": "7333195ffd7358a7e6fc56b7d0f55bdf550251f3c189ecd5ae0ca411b128858a",
     "src/domain/cards.js": "1256aa106867640a9a7a5d80804f8ad9cf161455c25b33239800b973925a38e9",

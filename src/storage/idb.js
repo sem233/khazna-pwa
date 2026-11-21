@@ -285,20 +285,6 @@ export class VaultStorage {
     }
   }
 
-  async close() {
-    if (this._channel) {
-      try {
-        this._channel.close();
-      } catch {
-        // ignore
-      }
-      this._channel = null;
-    }
-    if (this.backend && typeof this.backend.close === 'function') {
-      await this.backend.close();
-    }
-  }
-
   async withWriteLock(fn) {
     const isOpaqueOrigin =
       typeof globalThis.location !== 'undefined' &&
