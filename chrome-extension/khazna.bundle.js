@@ -4775,6 +4775,18 @@
       } catch {
       }
     }
+    async close() {
+      if (this._channel) {
+        try {
+          this._channel.close();
+        } catch {
+        }
+        this._channel = null;
+      }
+      if (this.backend && typeof this.backend.close === "function") {
+        await this.backend.close();
+      }
+    }
     async withWriteLock(fn) {
       const isOpaqueOrigin = typeof globalThis.location !== "undefined" && (globalThis.location.protocol === "file:" || globalThis.location.origin === "null");
       if (!isOpaqueOrigin && typeof globalThis.navigator?.locks?.request === "function") {
