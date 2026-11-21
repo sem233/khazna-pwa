@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1730"/>
+      <stop offset="50%" stop-color="#132142"/>
+      <stop offset="100%" stop-color="#070b14"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#7c9bff"/>
+      <stop offset="52%" stop-color="#4f74ff"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#132247"/>
+      <stop offset="100%" stop-color="#0a1226"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="148" cy="136" r="170" fill="#4f74ff" fill-opacity="0.18"/>
+  <circle cx="384" cy="382" r="165" fill="#22d3ee" fill-opacity="0.15"/>
+  <g transform="translate(56 56) scale(0.78125)">
+    <path d="M256 72 L404 128 V244 C404 338 342 409 256 444 C170 409 108 338 108 244 V128 Z" fill="url(#shield)"/>
+    <path d="M256 102 L376 148 V242 C376 320 325 381 256 411 C187 381 136 320 136 242 V148 Z" fill="url(#inner)"/>
+    <rect x="200" y="236" width="112" height="92" rx="22" fill="url(#shield)"/>
+    <path d="M222 236 V206 C222 187 237 172 256 172 C275 172 290 187 290 206 V236" fill="none" stroke="url(#shield)" stroke-width="22" stroke-linecap="round"/>
+    <circle cx="256" cy="274" r="14" fill="#070b14"/>
+    <rect x="249" y="278" width="14" height="28" rx="7" fill="#070b14"/>
+  </g>
+</svg>

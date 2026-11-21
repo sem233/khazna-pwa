@@ -1,0 +1,608 @@
+/**
+ * Khazna Settings View
+ *
+ * - Language (Arabic RTL / English LTR) & Theme (Dark / Light / AMOLED) & Low-End Blur
+ * - Security: Auto-lock, BG grace, Clipboard clear (+ honest platform note), Copy Combo mode,
+ *   Re-auth sensitive actions, WebAuthn PRF / Honest Convenience setup, Change Master Password,
+ *   Rotate Recovery Key, Optional Wipe-after-N-failures
+ * - Data: Local Import/Export launcher, Vault Health Check, Rolling Encrypted Snapshots restore
+ * - PWA & Integrity: In-App Install Prompt button (with iOS fallback), User-Gated SW Update activator,
+ *   Persistent Storage status, App Version & App-Shell SHA-256 hash, Honest Screenshot Warning, Wipe Vault
+ */
+
+import { formatError, t } from '../i18n/strings.js';
+import { el, openBottomSheet, requestReauth, showToast, svgIcon } from './dom.js';
+
+export function renderSettingsView({
+  session,
+  lang,
+  storageStatus,
+  integrityInfo,
+  snapshots,
+  pwaState,
+  onOpenImportExport,
+  onOpenSync,
+  onDownloadZip,
+  onRefresh,
+  onApplySettings,
+  onActivateUpdate,
+  onInstallPwa,
+}) {
+  const container = el('div', { class: 'settings-group view-enter' });
+  const settings = session.settings || {};
+  const bioState = session.getBiometricState();
+
+  // --- 1) Appearance & Language ---
+  const langSel = el(
+    'select',
+    {
+      class: 'select',
+      'aria-label': t(lang, 'langLabel'),
+      onChange: async (e) => {
+        await session.updateSettings({ lang: e.target.value });
+        onApplySettings();
+      },
+    },
+    el('option', { value: 'ar', selected: lang === 'ar' }, 'العربية (RTL)'),
+    el('option', { value: 'en', selected: lang === 'en' }, 'English (LTR)')
+  );
+
+  const themeSel = el(
+    'select',
+    {
+      class: 'select',
+      'aria-label': t(lang, 'themeLabel'),
+      onChange: async (e) => {
+        await session.updateSettings({ theme: e.target.value });
+        onApplySettings();
+      },
+    },
+    el('option', { value: 'dark', selected: settings.theme === 'dark' }, t(lang, 'themeDark')),
+    el('option', { value: 'light', selected: settings.theme === 'light' }, t(lang, 'themeLight')),
+    el('option', { value: 'amoled', selected: settings.theme === 'amoled' }, t(lang, 'themeAmoled'))
+  );
+
+  const comboSel = el(
+    'select',
+    {
+      class: 'select',
+      'aria-label': t(lang, 'copyComboModeLabel'),
+      onChange: async (e) => {
+        await session.updateSettings({ copyComboMode: e.target.value });
+        showToast(t(lang, 'save'), 'success');
+      },
+    },
+    el('option', { value: 'two-step', selected: settings.copyComboMode !== 'one-tap' }, t(lang, 'comboTwoStep')),
+    el('option', { value: 'one-tap', selected: settings.copyComboMode === 'one-tap' }, t(lang, 'comboOneTap'))
+  );
+
+  container.appendChild(
+    el(
+      'section',
+      { class: 'glass-card settings-group' },
+      el('h2', { class: 'sheet-title' }, t(lang, 'settingsAppearance')),
+      el('div', { class: 'settings-row' }, el('span', { class: 'settings-row-title' }, t(lang, 'langLabel')), langSel),
+      el('div', { class: 'settings-row' }, el('span', { class: 'settings-row-title' }, t(lang, 'themeLabel')), themeSel),
+      el('div', { class: 'settings-row' }, el('span', { class: 'settings-row-title' }, t(lang, 'copyComboModeLabel')), comboSel)
+    )
+  );
+
+  // --- 2) Security & Lock ---
+  const autoLockSel = el(
+    'select',
+    {
+      class: 'select',
+      'aria-label': t(lang, 'autoLockLabel'),
+      onChange: async (e) => {
+        await session.updateSettings({ autoLockSec: parseInt(e.target.value, 10) });
+        showToast(t(lang, 'save'), 'success');
+      },
+    },
+    ...[30, 60, 120, 300, 600, 900].map((sec) =>
+      el(
+        'option',
+        { value: sec, selected: (settings.autoLockSec ?? 120) === sec },
+        sec < 60 ? `${sec} ${t(lang, 'seconds')}` : `${sec / 60} ${t(lang, 'minutes')}`
+      )
+    )
+  );
+
+  const bgGraceSel = el(
+    'select',
+    {
+      class: 'select',
+      'aria-label': t(lang, 'bgGraceLabel'),
+      onChange: async (e) => {
+        await session.updateSettings({ bgGraceSec: parseInt(e.target.value, 10) });
+        showToast(t(lang, 'save'), 'success');
+      },
+    },
+    ...[0, 15, 30, 60].map((sec) =>
+      el('option', { value: sec, selected: (settings.bgGraceSec ?? 15) === sec }, `${sec} ${t(lang, 'seconds')}`)
+    )
+  );
+
+  const clipSel = el(
+    'select',
+    {
+      class: 'select',
+      'aria-label': t(lang, 'clipboardClearLabel'),
+      onChange: async (e) => {
+        await session.updateSettings({ clipboardClearSec: parseInt(e.target.value, 10) });
+        showToast(t(lang, 'save'), 'success');
+      },
+    },
+    ...[0, 15, 30, 60].map((sec) =>
+      el('option', { value: sec, selected: (settings.clipboardClearSec ?? 30) === sec }, sec === 0 ? (lang === 'en' ? 'Off' : 'معطّل') : `${sec} ${t(lang, 'seconds')}`)
+    )
+  );
+
+  const reauthCheck = el('input', {
+    type: 'checkbox',
+    checked: settings.reauthSensitive !== false,
+    onChange: async (e) => {
+      await session.updateSettings({ reauthSensitive: e.target.checked });
+    },
+  });
+
+  const wipeSel = el(
+    'select',
+    {
+      class: 'select',
+      'aria-label': t(lang, 'wipeAfterLabel'),
+      onChange: async (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (val > 0) {
+          const ok = await requestReauth({ session, lang });
+          if (!ok) {
+            e.target.value = String(session.header?.security?.wipeAfterFailures || 0);
+            return;
+          }
+        }
+        await session.setWipeAfterFailures(val);
+        showToast(t(lang, 'save'), val > 0 ? 'warn' : 'success');
+      },
+    },
+    el('option', { value: 0, selected: !(session.header?.security?.wipeAfterFailures) }, t(lang, 'wipeAfterOff')),
+    el('option', { value: 5, selected: session.header?.security?.wipeAfterFailures === 5 }, '5'),
+    el('option', { value: 10, selected: session.header?.security?.wipeAfterFailures === 10 }, '10')
+  );
+
+  const bioDesc = bioState.enabled
+    ? (bioState.mode === 'prf' ? t(lang, 'biometricPrfActive') : t(lang, 'biometricConvActive'))
+    : t(lang, 'biometricOff');
+
+  const bioActionBtn = bioState.enabled
+    ? el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-sm btn-danger',
+          onClick: async () => {
+            await session.disableBiometric();
+            showToast(t(lang, 'disableBiometric'), 'info');
+            await onRefresh();
+          },
+        },
+        t(lang, 'disableBiometric')
+      )
+    : el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-sm btn-primary',
+          onClick: () => openBiometricSetupSheet({ session, lang, onDone: onRefresh }),
+        },
+        svgIcon('fingerprint', 16),
+        t(lang, 'enableBiometric')
+      );
+
+  container.appendChild(
+    el(
+      'section',
+      { class: 'glass-card settings-group' },
+      el('h2', { class: 'sheet-title' }, t(lang, 'settingsSecurity')),
+      el('div', { class: 'settings-row' }, el('span', { class: 'settings-row-title' }, t(lang, 'autoLockLabel')), autoLockSel),
+      el('div', { class: 'settings-row' }, el('span', { class: 'settings-row-title' }, t(lang, 'bgGraceLabel')), bgGraceSel),
+      el('div', { class: 'settings-row' }, el('span', { class: 'settings-row-title' }, t(lang, 'clipboardClearLabel')), clipSel),
+      el('div', { class: 'banner banner-info' }, el('span', null, t(lang, 'clipboardLimitNote'))),
+      el('label', { class: 'checkbox-row' }, reauthCheck, el('span', null, t(lang, 'reauthLabel'))),
+      el(
+        'div',
+        { class: 'settings-row' },
+        el('div', { class: 'settings-row-info' }, el('div', { class: 'settings-row-title' }, t(lang, 'biometricTitle')), el('div', { class: 'settings-row-desc' }, bioDesc)),
+        bioActionBtn
+      ),
+      el('div', { class: 'settings-row' }, el('span', { class: 'settings-row-title' }, t(lang, 'wipeAfterLabel')), wipeSel),
+      el(
+        'div',
+        { class: 'form-grid-2' },
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'btn',
+            onClick: () => openChangeMasterPasswordSheet({ session, lang }),
+          },
+          svgIcon('key', 16),
+          t(lang, 'changeMasterPwd')
+        ),
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'btn',
+            onClick: () => openRotateRecoverySheet({ session, lang }),
+          },
+          svgIcon('refresh', 16),
+          t(lang, 'rotateRecoveryKey')
+        )
+      )
+    )
+  );
+
+  // --- 3) Data, Health Check & Rolling Encrypted Snapshots ---
+  const healthResultNode = el('div', { class: 'banner hidden' });
+
+  const snapList = el('div', { class: 'settings-group' });
+  if (snapshots.length === 0) {
+    snapList.appendChild(el('span', { class: 'settings-row-desc' }, lang === 'en' ? 'No snapshots yet.' : 'لا توجد لقطات بعد.'));
+  } else {
+    for (const s of snapshots) {
+      snapList.appendChild(
+        el(
+          'div',
+          { class: 'settings-row' },
+          el(
+            'div',
+            { class: 'settings-row-info' },
+            el('div', { class: 'settings-row-title' }, `${s.reason} (${s.recordCount})`),
+            el('div', { class: 'settings-row-desc' }, new Date(s.createdAt).toLocaleString(lang === 'en' ? 'en' : 'ar'))
+          ),
+          el(
+            'button',
+            {
+              type: 'button',
+              class: 'btn btn-sm',
+              onClick: async () => {
+                const ok = await requestReauth({ session, lang });
+                if (!ok) return;
+                await session.storage.restoreSnapshot(s.id);
+                showToast(t(lang, 'restoreSnapshot'), 'success');
+                await onRefresh();
+              },
+            },
+            t(lang, 'restoreSnapshot')
+          )
+        )
+      );
+    }
+  }
+
+  container.appendChild(
+    el(
+      'section',
+      { class: 'glass-card settings-group' },
+      el('h2', { class: 'sheet-title' }, t(lang, 'settingsData')),
+      el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-primary btn-block',
+          'data-testid': 'settings-sync-btn',
+          onClick: onOpenSync,
+        },
+        svgIcon('link', 17),
+        t(lang, 'syncSettingsBtn')
+      ),
+      el(
+        'div',
+        { class: 'form-grid-2' },
+        el('button', { type: 'button', class: 'btn', onClick: onOpenImportExport }, svgIcon('download', 17), t(lang, 'importExportBtn')),
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'btn',
+            onClick: async () => {
+              const report = await session.runHealthCheck();
+              healthResultNode.className = `banner ${report.ok ? 'banner-success' : 'banner-danger'}`;
+              healthResultNode.textContent = report.ok
+                ? (lang === 'en' ? `Health Check Passed: ${report.valid}/${report.total} records decrypted & authenticated.` : `نجح الفحص: تم فك تشفير والتحقق من ${report.valid}/${report.total} سجل بنجاح ✓`)
+                : (lang === 'en' ? `Corrupted records detected: ${report.corrupted.length}` : `تم اكتشاف ${report.corrupted.length} سجل تالف!`);
+            },
+          },
+          svgIcon('shield', 17),
+          t(lang, 'healthCheckBtn')
+        )
+      ),
+      healthResultNode,
+      el('h3', { class: 'settings-row-title' }, t(lang, 'snapshotsTitle')),
+      snapList
+    )
+  );
+
+  // --- 4) PWA, Persistent Storage, App-Shell Integrity & Danger Zone ---
+  const pwaCard = el('section', { class: 'glass-card settings-group' }, el('h2', { class: 'sheet-title' }, t(lang, 'settingsPwa')));
+
+  if (pwaState.updateWaiting) {
+    pwaCard.appendChild(
+      el(
+        'div',
+        { class: 'banner banner-info' },
+        el('span', null, t(lang, 'updateAvailable')),
+        el('button', { type: 'button', class: 'btn btn-sm btn-primary', onClick: onActivateUpdate }, t(lang, 'updateConfirmBtn'))
+      )
+    );
+  }
+
+  if (!pwaState.isInstalled) {
+    if (pwaState.canInstall) {
+      pwaCard.appendChild(
+        el('button', { type: 'button', class: 'btn btn-primary btn-block', onClick: onInstallPwa }, svgIcon('download', 17), t(lang, 'installAppBtn'))
+      );
+    } else if (pwaState.isIOS) {
+      pwaCard.appendChild(el('div', { class: 'banner banner-info' }, el('span', null, t(lang, 'installIosHint'))));
+    }
+  }
+
+  if (onDownloadZip) {
+    pwaCard.appendChild(
+      el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-block',
+          'data-testid': 'settings-download-zip',
+          onClick: onDownloadZip,
+        },
+        svgIcon('download', 17),
+        t(lang, 'downloadZipBtn')
+      )
+    );
+  }
+
+  const kdfInfo = session.header
+    ? `${session.header.kdf} (${JSON.stringify(session.header.kdfParams)})`
+    : '—';
+
+  pwaCard.appendChild(
+    el(
+      'div',
+      { class: 'settings-row' },
+      el('span', { class: 'settings-row-title' }, t(lang, 'storageStatusLabel')),
+      el('span', { class: 'settings-row-desc' }, storageStatus?.persisted ? t(lang, 'storagePersisted') : t(lang, 'storageBestEffort'))
+    )
+  );
+  pwaCard.appendChild(
+    el(
+      'div',
+      { class: 'settings-row' },
+      el('span', { class: 'settings-row-title' }, t(lang, 'appVersionLabel')),
+      el('span', { class: 'settings-row-desc ltr-inline mono' }, `v${integrityInfo?.version || '1.0.0'} • ${kdfInfo}`)
+    )
+  );
+  pwaCard.appendChild(
+    el(
+      'div',
+      { class: 'field' },
+      el('span', { class: 'settings-row-title' }, t(lang, 'appShellHashLabel')),
+      el('div', { class: 'hash-box', 'data-testid': 'app-shell-hash' }, integrityInfo?.shellSha256 || 'computing...')
+    )
+  );
+  pwaCard.appendChild(el('div', { class: 'banner banner-warn' }, el('span', null, t(lang, 'screenshotHonesty'))));
+
+  // Danger Zone: Wipe Vault
+  pwaCard.appendChild(
+    el(
+      'button',
+      {
+        type: 'button',
+        class: 'btn btn-danger btn-block',
+        onClick: () => openWipeVaultSheet({ session, lang }),
+      },
+      svgIcon('trash', 17),
+      t(lang, 'wipeVaultBtn')
+    )
+  );
+
+  container.appendChild(pwaCard);
+  return container;
+}
+
+function openBiometricSetupSheet({ session, lang, onDone }) {
+  const errBox = el('div', { class: 'banner banner-danger hidden', role: 'alert' });
+  const pwdIn = el('input', {
+    type: 'password',
+    class: 'input ltr-value',
+    autocomplete: 'off',
+    spellcheck: 'false',
+    required: true,
+    placeholder: t(lang, 'masterPasswordLabel'),
+  });
+  const body = el('div', { class: 'settings-group' });
+
+  const form = el(
+    'form',
+    {
+      onSubmit: async (e) => {
+        e.preventDefault();
+        errBox.classList.add('hidden');
+        try {
+          const res = await session.enrollBiometricWithPassword(pwdIn.value);
+          pwdIn.value = '';
+          if (res.mode === 'prf') {
+            sheet.close();
+            showToast(t(lang, 'biometricPrfActive'), 'success');
+            onDone && (await onDone());
+          } else if (res.mode === 'prf-unavailable') {
+            while (body.firstChild) body.removeChild(body.firstChild);
+            body.appendChild(el('div', { class: 'banner banner-warn' }, el('span', null, lang === 'en' ? res.warningEn : res.warningAr)));
+            body.appendChild(
+              el(
+                'div',
+                { class: 'form-grid-2' },
+                el('button', { type: 'button', class: 'btn', onClick: () => sheet.close() }, t(lang, 'cancel')),
+                el(
+                  'button',
+                  {
+                    type: 'button',
+                    class: 'btn btn-primary',
+                    onClick: async () => {
+                      await res._armConvenience();
+                      sheet.close();
+                      showToast(t(lang, 'biometricConvActive'), 'warn', 4200);
+                      onDone && (await onDone());
+                    },
+                  },
+                  lang === 'en' ? 'Enable Convenience Mode' : 'تفعيل وضع الراحة'
+                )
+              )
+            );
+          }
+        } catch (err) {
+          errBox.textContent = formatError(err, lang);
+          errBox.classList.remove('hidden');
+        }
+      },
+    },
+    errBox,
+    el('div', { class: 'field' }, el('label', { class: 'field-label' }, t(lang, 'masterPasswordLabel')), pwdIn),
+    el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, svgIcon('fingerprint', 18), t(lang, 'enableBiometric'))
+  );
+
+  body.appendChild(form);
+  const sheet = openBottomSheet({ title: t(lang, 'biometricTitle'), content: body });
+}
+
+function openChangeMasterPasswordSheet({ session, lang }) {
+  const errBox = el('div', { class: 'banner banner-danger hidden', role: 'alert' });
+  const curIn = el('input', { type: 'password', class: 'input ltr-value', autocomplete: 'off', required: true });
+  const newIn = el('input', { type: 'password', class: 'input ltr-value', autocomplete: 'off', required: true, minlength: 12 });
+  const confIn = el('input', { type: 'password', class: 'input ltr-value', autocomplete: 'off', required: true });
+  const submitBtn = el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, t(lang, 'save'));
+
+  const form = el(
+    'form',
+    {
+      onSubmit: async (e) => {
+        e.preventDefault();
+        errBox.classList.add('hidden');
+        if (newIn.value !== confIn.value) {
+          errBox.textContent = t(lang, 'passwordsMismatch');
+          errBox.classList.remove('hidden');
+          return;
+        }
+        submitBtn.disabled = true;
+        try {
+          await session.changeMasterPassword({
+            currentPassword: curIn.value,
+            newMasterPassword: newIn.value,
+          });
+          curIn.value = '';
+          newIn.value = '';
+          confIn.value = '';
+          sheet.close();
+          showToast(t(lang, 'changeMasterPwd'), 'success');
+        } catch (err) {
+          errBox.textContent = formatError(err, lang);
+          errBox.classList.remove('hidden');
+          submitBtn.disabled = false;
+        }
+      },
+    },
+    errBox,
+    el('div', { class: 'field' }, el('label', { class: 'field-label' }, lang === 'en' ? 'Current Master Password' : 'كلمة المرور الرئيسية الحالية'), curIn),
+    el('div', { class: 'field' }, el('label', { class: 'field-label' }, lang === 'en' ? 'New Master Password (12+ chars)' : 'كلمة المرور الرئيسية الجديدة (١٢ حرفاً+)'), newIn),
+    el('div', { class: 'field' }, el('label', { class: 'field-label' }, t(lang, 'confirmPasswordLabel')), confIn),
+    submitBtn
+  );
+
+  const sheet = openBottomSheet({ title: t(lang, 'changeMasterPwd'), content: form });
+}
+
+function openRotateRecoverySheet({ session, lang }) {
+  const errBox = el('div', { class: 'banner banner-danger hidden', role: 'alert' });
+  const pwdIn = el('input', { type: 'password', class: 'input ltr-value', autocomplete: 'off', required: true });
+  const host = el('div', { class: 'settings-group' });
+
+  const form = el(
+    'form',
+    {
+      onSubmit: async (e) => {
+        e.preventDefault();
+        errBox.classList.add('hidden');
+        try {
+          const { recoveryKeyFormatted } = await session.rotateRecoveryKeyWithPassword(pwdIn.value);
+          pwdIn.value = '';
+          while (host.firstChild) host.removeChild(host.firstChild);
+          host.appendChild(el('div', { class: 'banner banner-warn' }, el('span', null, t(lang, 'recoveryModalWarn'))));
+          host.appendChild(el('div', { class: 'recovery-key-display' }, recoveryKeyFormatted));
+          host.appendChild(
+            el(
+              'button',
+              {
+                type: 'button',
+                class: 'btn btn-primary btn-block',
+                onClick: async () => {
+                  await navigator.clipboard.writeText(recoveryKeyFormatted);
+                  showToast(t(lang, 'copiedToast'), 'success');
+                },
+              },
+              svgIcon('copy', 16),
+              t(lang, 'copyRecoveryKey')
+            )
+          );
+        } catch (err) {
+          errBox.textContent = formatError(err, lang);
+          errBox.classList.remove('hidden');
+        }
+      },
+    },
+    errBox,
+    el('div', { class: 'field' }, el('label', { class: 'field-label' }, t(lang, 'masterPasswordLabel')), pwdIn),
+    el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, t(lang, 'rotateRecoveryKey'))
+  );
+
+  host.appendChild(form);
+  openBottomSheet({ title: t(lang, 'rotateRecoveryKey'), content: host });
+}
+
+function openWipeVaultSheet({ session, lang }) {
+  const confirmIn = el('input', {
+    type: 'text',
+    class: 'input ltr-value',
+    autocomplete: 'off',
+    placeholder: 'WIPE',
+  });
+  const btn = el(
+    'button',
+    {
+      type: 'button',
+      class: 'btn btn-danger btn-block',
+      disabled: true,
+      onClick: async () => {
+        const ok = await requestReauth({ session, lang });
+        if (!ok) return;
+        await session.wipeVault();
+        sheet.close();
+        showToast(t(lang, 'wipeVaultBtn'), 'warn');
+      },
+    },
+    t(lang, 'wipeVaultBtn')
+  );
+
+  confirmIn.addEventListener('input', () => {
+    btn.disabled = confirmIn.value.trim().toUpperCase() !== 'WIPE';
+  });
+
+  const content = el(
+    'div',
+    { class: 'settings-group' },
+    el('div', { class: 'banner banner-danger' }, el('span', null, t(lang, 'wipeVaultWarn'))),
+    el('div', { class: 'field' }, el('label', { class: 'field-label' }, lang === 'en' ? 'Type WIPE to confirm' : 'اكتب WIPE للتأكيد'), confirmIn),
+    btn
+  );
+
+  const sheet = openBottomSheet({ title: t(lang, 'wipeVaultBtn'), content });
+}

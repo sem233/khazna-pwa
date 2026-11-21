@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#070b14" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="خزنة" />
+    <title>خزنة (Khazna) — مدير كلمات مرور محلي</title>
+    <meta
+      name="description"
+      content="خزنة: مدير كلمات مرور خاص ومحلي ١٠٠٪ بتشفير صفري المعرفة (Argon2id + AES-256-GCM + WebAuthn PRF) كـ PWA يعمل دون إنترنت."
+    />
+    <meta property="og:title" content="خزنة (Khazna) — مدير كلمات مرور محلي" />
+    <meta
+      property="og:description"
+      content="مدير كلمات مرور محلي ١٠٠٪ بتشفير صفري المعرفة يعمل دون إنترنت على هاتفك."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="./styles/theme.css" />
+    <link rel="stylesheet" href="./styles/components.css" />
+    <link rel="stylesheet" href="./styles/animations.css" />
+  </head>
+  <body>
+    <div class="aurora-bg" aria-hidden="true"></div>
+    <div id="app" role="application" aria-label="خزنة — مدير كلمات المرور"></div>
+    <div id="modal-root"></div>
+    <div id="toast-root" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
+    <div id="privacy-overlay" class="privacy-overlay hidden" aria-hidden="true">
+      <div class="auth-hero-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <h2 id="privacy-title">خزنة محمية</h2>
+      <p id="privacy-sub">تم إخفاء المحتوى لحماية خصوصيتك</p>
+    </div>
+    <script defer src="./src/file-check.js"></script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

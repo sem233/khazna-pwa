@@ -1,0 +1,135 @@
+/* Khazna (خزنة) — 60fps Transform & Opacity Animations + Prefers-Reduced-Motion */
+
+@keyframes auroraDrift {
+  0% {
+    transform: translate3d(0%, 0%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2.5%, -2.5%, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(0%, 0%, 0) scale(1);
+  }
+}
+
+.aurora-bg {
+  animation: auroraDrift 26s ease-in-out infinite;
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes sheetSlideIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes toastPop {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes skeletonPulse {
+  0%, 100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.view-enter {
+  animation: fadeSlideUp 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.stagger-item {
+  animation: fadeSlideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.stagger-item:nth-child(2) { animation-delay: 0.03s; }
+.stagger-item:nth-child(3) { animation-delay: 0.06s; }
+.stagger-item:nth-child(4) { animation-delay: 0.09s; }
+.stagger-item:nth-child(5) { animation-delay: 0.12s; }
+.stagger-item:nth-child(6) { animation-delay: 0.15s; }
+.stagger-item:nth-child(n+7) { animation-delay: 0.18s; }
+
+.sheet-panel {
+  animation: sheetSlideIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.toast {
+  animation: toastPop 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.mini-copy-bar {
+  animation: sheetSlideIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.skeleton-line {
+  height: 16px;
+  border-radius: 8px;
+  background: var(--border-hairline);
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+}
+
+/* View Transitions API smooth cross-fade when supported */
+::view-transition-old(root) {
+  animation: 140ms ease-out both vtFadeOut;
+}
+
+::view-transition-new(root) {
+  animation: 180ms cubic-bezier(0.22, 1, 0.36, 1) both vtFadeIn;
+}
+
+@keyframes vtFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes vtFadeIn {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Honor prefers-reduced-motion strictly */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-bg,
+  .view-enter,
+  .stagger-item,
+  .sheet-panel,
+  .toast,
+  .mini-copy-bar,
+  .skeleton-line {
+    animation: none !important;
+  }
+  .bank-card-3d,
+  .btn,
+  .nav-item,
+  .fab-btn {
+    transition: none !important;
+  }
+}
+
+:root[data-blur="reduced"] .aurora-bg {
+  animation: none;
+}
