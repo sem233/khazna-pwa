@@ -29,9 +29,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Update Integrity & Prepare Web
         run: |
           node scripts/update-integrity.mjs
@@ -54,10 +51,10 @@ jobs:
           npm install
           npx cap add android || true
           npx cap sync android
-          
-          # Inject AndroidManifest permissions and Quick Settings Tile
           cd android
-          ./gradlew assembleDebug
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+          mkdir -p ../../dist
           cp app/build/outputs/apk/debug/app-debug.apk ../../dist/khazna-v2.0.0.apk
           cd ../..
 
