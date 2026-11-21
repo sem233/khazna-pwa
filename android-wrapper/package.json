@@ -17,7 +17,7 @@
     "@capacitor/app": "^6.0.0",
     "@capacitor/haptics": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0",
-    "@capacitor-community/biometric-auth": "^5.0.0",
+    "@aparajita/capacitor-biometric-auth": "^10.0.0",
     "@capacitor/clipboard": "^6.0.0"
   },
   "devDependencies": {

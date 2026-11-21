@@ -49,6 +49,8 @@ jobs:
         run: |
           cd android-wrapper
           npm install
+          mkdir -p www
+          cp -r ../index.html ../manifest.webmanifest ../sw.js ../_headers ../app-integrity.json ../styles ../icons ../src ../vendor www/
           npx cap add android || true
           npx cap sync android
           cd android

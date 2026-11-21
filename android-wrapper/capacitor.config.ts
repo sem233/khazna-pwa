@@ -3,7 +3,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.khazna.passwordmanager',
   appName: 'خزنة',
-  webDir: '../',  // Points to the PWA root (index.html)
+  webDir: 'www',  // Points to the PWA root (index.html)
   bundledWebRuntime: false,
   server: {
     // Use local files only — no remote server
