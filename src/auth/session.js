@@ -18,7 +18,7 @@ import {
   unwrapDekWithPassword,
   unwrapDekWithRecoveryKey,
 } from '../crypto/vault-crypto.js';
-import { KhaznaError, randomId } from '../crypto/utils.js';
+import { base64ToBytes, bytesToBase64, KhaznaError, randomId, zeroize } from '../crypto/utils.js';
 import {
   armConvenienceRamSession,
   clearConvenienceRamSession,
@@ -27,6 +27,17 @@ import {
   unlockWithBiometric,
   verifyBiometricForReauth,
 } from './webauthn.js';
+
+function getNativeBiometricPlugin(env = globalThis) {
+  try {
+    if (env.Capacitor?.Plugins?.NativeBiometric) {
+      return env.Capacitor.Plugins.NativeBiometric;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
 
 const BACKOFF_SCHEDULE_SEC = Object.freeze([0, 0, 0, 5, 15, 30, 60, 120, 300, 600]);
 
@@ -208,6 +219,15 @@ export class VaultSession {
   }
 
   getBiometricState() {
+    const nativePlugin = getNativeBiometricPlugin(this._env);
+    if (nativePlugin) {
+      const nativeWrap = this._header?.wrappers?.nativeBiometric;
+      if (nativeWrap?.enabled) {
+        return { enabled: true, mode: 'native', ready: true, reason: 'native-ready' };
+      }
+      return { enabled: false, mode: 'native', ready: false, reason: 'disabled' };
+    }
+
     const wa = this._header?.wrappers?.webauthn;
     if (!wa) return { enabled: false, mode: null, ready: false, reason: 'disabled' };
     if (wa.mode === 'prf') {
@@ -386,7 +406,7 @@ export class VaultSession {
   }
 
   /**
-   * Unlocks the vault via Android Biometric (WebAuthn PRF or RAM-only Convenience Fallback).
+   * Unlocks the vault via Android Biometric (Native Android BiometricPrompt or WebAuthn PRF).
    */
   async unlockWithBiometric(opts = {}) {
     await this.refreshMeta();
@@ -394,6 +414,45 @@ export class VaultSession {
       throw new KhaznaError('NO_VAULT', 'لا توجد خزنة مهيّأة.', 'No vault exists.');
     }
     this._assertNotLockedOut();
+
+    const nativePlugin = getNativeBiometricPlugin(this._env);
+    if (nativePlugin && this._header?.wrappers?.nativeBiometric?.enabled) {
+      const isAr = (this._settings?.lang || 'ar') === 'ar';
+      let res;
+      try {
+        res = await nativePlugin.getSecret({
+          key: `khazna_vault_${this._header.vaultId}`,
+          title: isAr ? 'خزنة — فتح بالبصمة' : 'Khazna — Biometric Unlock',
+          subtitle: isAr ? 'المس مستشعر البصمة لفتح الخزنة' : 'Touch the fingerprint sensor to unlock',
+          cancelText: isAr ? 'كلمة المرور الرئيسية' : 'Master Password',
+        });
+      } catch (err) {
+        throw new KhaznaError('BIOMETRIC_CANCELLED', 'تم إلغاء التحقق بالبصمة.', 'Biometric authentication was cancelled.', err);
+      }
+
+      if (!res?.secret) {
+        throw new KhaznaError('BIOMETRIC_FAILED', 'فشل التحقق من البصمة.', 'Biometric authentication failed.');
+      }
+
+      const rawDekBytes = base64ToBytes(res.secret);
+      const dek = await this._env.crypto.subtle.importKey(
+        'raw',
+        rawDekBytes,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt', 'decrypt']
+      );
+      zeroize(rawDekBytes);
+
+      this.#dek = dek;
+      await this._resetFailedAttempts(false);
+      await this.storage.purgeExpiredTrash(30);
+      this._unlockedAt = this._now();
+      this._lastActivityAt = this._now();
+      this._scheduleInactivityLock();
+      this._emit('unlocked', { method: 'biometric-native' });
+      return { mode: 'native' };
+    }
 
     const { dek, mode } = await unlockWithBiometric(this._header, {
       ...opts,
@@ -502,7 +561,7 @@ export class VaultSession {
   }
 
   /**
-   * Enrolls WebAuthn biometric unlock (requires Master Password once to unwrap DEK transiently).
+   * Enrolls biometric unlock (Native Android BiometricPrompt or WebAuthn PRF).
    */
   async enrollBiometricWithPassword(masterPassword, opts = {}) {
     this._assertUnlocked();
@@ -510,6 +569,34 @@ export class VaultSession {
       extractable: true,
       useWorker: this._useWorker,
     });
+
+    const nativePlugin = getNativeBiometricPlugin(this._env);
+    if (nativePlugin) {
+      const rawDekBytes = await this._env.crypto.subtle.exportKey('raw', tempDek);
+      const b64Secret = bytesToBase64(new Uint8Array(rawDekBytes));
+      zeroize(new Uint8Array(rawDekBytes));
+
+      await nativePlugin.setSecret({
+        key: `khazna_vault_${this._header.vaultId}`,
+        secret: b64Secret,
+      });
+
+      const updatedHeader = {
+        ...this._header,
+        wrappers: {
+          ...this._header.wrappers,
+          nativeBiometric: {
+            enabled: true,
+            enrolledAt: this._now(),
+          },
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      await this.storage.saveHeader(updatedHeader);
+      this._header = updatedHeader;
+      this._emit('biometric-updated', { mode: 'native' });
+      return { mode: 'native' };
+    }
 
     const result = await enrollBiometric({
       header: this._header,
@@ -556,12 +643,21 @@ export class VaultSession {
 
   async disableBiometric() {
     this._assertUnlocked();
+    const nativePlugin = getNativeBiometricPlugin(this._env);
+    if (nativePlugin) {
+      try {
+        await nativePlugin.deleteSecret({ key: `khazna_vault_${this._header?.vaultId}` });
+      } catch {
+        // ignore
+      }
+    }
     clearConvenienceRamSession();
     const updatedHeader = {
       ...this._header,
       wrappers: {
         ...this._header.wrappers,
         webauthn: null,
+        nativeBiometric: null,
       },
       updatedAt: new Date().toISOString(),
     };

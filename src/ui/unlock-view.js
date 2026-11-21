@@ -353,11 +353,16 @@ export function renderUnlockView({
       card.appendChild(form);
 
       if (bioState.enabled) {
+        const isNative = bioState.mode === 'native';
+        const bioLabel = isNative
+          ? (lang === 'en' ? 'Unlock with Fingerprint' : 'فتح ببصمة الإصبع')
+          : t(lang, 'unlockWithFingerprint');
+
         const bioBtn = el(
           'button',
           {
             type: 'button',
-            class: 'btn btn-block',
+            class: `btn btn-block ${isNative ? 'btn-primary' : ''}`.trim(),
             disabled: !bioState.ready,
             onClick: async () => {
               errBox.classList.add('hidden');
@@ -370,7 +375,7 @@ export function renderUnlockView({
             },
           },
           svgIcon('fingerprint', 20),
-          t(lang, 'unlockWithFingerprint')
+          bioLabel
         );
         card.appendChild(bioBtn);
 

@@ -17,7 +17,20 @@ import { renderStatsView } from './ui/stats-view.js';
 import { openSyncSheet } from './ui/sync-sheet.js';
 import { renderUnlockView } from './ui/unlock-view.js';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '2.0.0';
+
+/**
+ * Returns true when running inside a real Capacitor Android app.
+ * Used to hide browser-only features (download ZIP, WebAuthn prompt, etc.)
+ */
+function isCapacitorAndroid() {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.Capacitor !== 'undefined' &&
+    window.Capacitor?.isNativePlatform?.() === true &&
+    window.Capacitor?.getPlatform?.() === 'android'
+  );
+}
 
 const storage = new VaultStorage();
 const session = new VaultSession({ storage });
@@ -175,7 +188,6 @@ function renderApp({ preserveSearchFocus = false } = {}) {
         lang,
         pendingRecoveryKey: appState.pendingRecoveryKey,
         hasPendingSync: Boolean(appState.pendingSyncCode),
-        onDownloadZip: handleDownloadZip,
         onToggleLang: async () => {
           await session.updateSettings({ lang: lang === 'ar' ? 'en' : 'ar' });
           applyThemeAndDirection();
@@ -191,6 +203,8 @@ function renderApp({ preserveSearchFocus = false } = {}) {
             withViewTransition(() => renderApp());
           }
         },
+        // Hide ZIP download in native Android — not needed and could confuse users
+        onDownloadZip: isCapacitorAndroid() ? null : handleDownloadZip,
       })
     );
     return;
@@ -784,6 +798,14 @@ async function bootstrap() {
   }
 
   renderApp();
+
+  // Expose a global hook for Capacitor's MainActivity to trigger overlay mode from the Quick Settings Tile intent.
+  // Called by the Android WebView bridge when the app is opened with overlay=true.
+  window.__activateOverlayMode = () => {
+    appState.isOverlayMode = true;
+    document.documentElement.classList.add('overlay-mode');
+    renderApp();
+  };
 
   // Non-blocking storage persistence & app-shell integrity check
   storage.requestPersistentStorage().then((st) => {

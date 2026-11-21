@@ -169,7 +169,11 @@ export function renderSettingsView({
   );
 
   const bioDesc = bioState.enabled
-    ? (bioState.mode === 'prf' ? t(lang, 'biometricPrfActive') : t(lang, 'biometricConvActive'))
+    ? bioState.mode === 'native'
+      ? (lang === 'en' ? 'Native Android Biometric (Active)' : 'بصمة أندرويد الحقيقية (مفعّلة)')
+      : bioState.mode === 'prf'
+        ? t(lang, 'biometricPrfActive')
+        : t(lang, 'biometricConvActive')
     : t(lang, 'biometricOff');
 
   const bioActionBtn = bioState.enabled
@@ -431,9 +435,16 @@ function openBiometricSetupSheet({ session, lang, onDone }) {
         try {
           const res = await session.enrollBiometricWithPassword(pwdIn.value);
           pwdIn.value = '';
-          if (res.mode === 'prf') {
+          if (res.mode === 'prf' || res.mode === 'native') {
             sheet.close();
-            showToast(t(lang, 'biometricPrfActive'), 'success');
+            showToast(
+              res.mode === 'native'
+                ? lang === 'en'
+                  ? 'Native Android Biometric Enabled ✓'
+                  : 'تم تفعيل بصمة أندرويد بنجاح ✓'
+                : t(lang, 'biometricPrfActive'),
+              'success'
+            );
             onDone && (await onDone());
           } else if (res.mode === 'prf-unavailable') {
             while (body.firstChild) body.removeChild(body.firstChild);

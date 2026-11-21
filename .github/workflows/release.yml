@@ -1,4 +1,4 @@
-name: Build and Release Khazna (Android APK, PC Web, Chrome Extension)
+name: Build and Release Khazna v2 (Android APK, PC Standalone, Chrome Extension)
 
 on:
   push:
@@ -33,64 +33,111 @@ jobs:
         run: |
           node scripts/update-integrity.mjs
 
+      # ─── PC Standalone Build ──────────────────────────────────────────────
+      - name: Build PC Standalone (single-file + 3-file)
+        run: |
+          node scripts/build-standalone-pc.mjs
+          # Zip the 3-file PC distribution
+          mkdir -p dist
+          cd dist/pc && zip -r ../khazna-pc-standalone-${{ github.ref_name }}.zip ./* && cd ../..
+          echo "✓ PC standalone zip ready"
+
+      # ─── Chrome Extension ─────────────────────────────────────────────────
       - name: Package Chrome Extension
         run: |
           mkdir -p dist
-          cd chrome-extension && zip -r ../dist/khazna-chrome-extension-v2.0.0.zip ./* && cd ..
+          cd chrome-extension && zip -r ../dist/khazna-chrome-extension-${{ github.ref_name }}.zip ./* && cd ..
+          echo "✓ Chrome extension zip ready"
 
-      - name: Package PC Web Static Release
+      # ─── Legacy PC Web ZIP (source distribution) ─────────────────────────
+      - name: Package PC Web Source ZIP
         run: |
-          zip -r dist/khazna-pc-web-v2.0.0.zip \
+          zip -r dist/khazna-pc-web-${{ github.ref_name }}.zip \
             index.html manifest.webmanifest sw.js _headers app-integrity.json \
             local-server.mjs start-khazna.bat start-khazna.sh README.md SECURITY.md \
             styles icons src vendor package.json
+          echo "✓ PC Web source zip ready"
 
-      - name: Build Android APK (Capacitor)
+      # ─── Android APK Build ───────────────────────────────────────────────
+      - name: Install Android Wrapper Dependencies
+        working-directory: android-wrapper
+        run: npm install
+
+      - name: Sync Web Assets to Capacitor www/
+        working-directory: android-wrapper
         run: |
-          cd android-wrapper
-          npm install
           mkdir -p www
-          cp -r ../index.html ../manifest.webmanifest ../sw.js ../_headers ../app-integrity.json ../styles ../icons ../src ../vendor www/
+          cp -r ../index.html ../manifest.webmanifest ../sw.js ../_headers ../app-integrity.json \
+                ../styles ../icons ../src ../vendor www/
+
+      - name: Capacitor Add & Sync Android
+        working-directory: android-wrapper
+        run: |
           npx cap add android || true
           npx cap sync android
-          cd android
+
+      - name: Setup Khazna Native Android Features
+        working-directory: android-wrapper
+        run: |
+          node scripts/setup-android-native.mjs
+          echo "✓ Native Android biometric + Quick Settings Tile injected"
+
+      - name: Build Android APK (Capacitor + Gradle)
+        working-directory: android-wrapper/android
+        run: |
           chmod +x ./gradlew
           ./gradlew assembleDebug --no-daemon
           mkdir -p ../../dist
-          cp app/build/outputs/apk/debug/app-debug.apk ../../dist/khazna-v2.0.0.apk
-          cd ../..
+          cp app/build/outputs/apk/debug/app-debug.apk ../../dist/khazna-${{ github.ref_name }}.apk
+          echo "✓ APK built: khazna-${{ github.ref_name }}.apk"
 
+      # ─── Create GitHub Release ────────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
-          tag_name: ${{ github.ref_name || 'v2.0.0' }}
-          name: "خزنة (Khazna) v2.0.0 — Android APK & PC Web & Chrome Extension"
+          tag_name: ${{ github.ref_name || 'v2.1.0' }}
+          name: "خزنة (Khazna) ${{ github.ref_name }} — Android APK & PC Standalone & Chrome Extension"
           body: |
-            ## 🎉 الإصدار 2.0.0 من خزنة (Khazna)
-            
+            ## 🎉 الإصدار ${{ github.ref_name }} من خزنة (Khazna)
+
             مدير كلمات مرور وبطاقات وملاحظات مشفّرة محلي ١٠٠٪ بدون خوادم، بدون حسابات، وبياناتك لا تغادر جهازك أبداً.
-            
-            ### 📱 محتويات هذا الإصدار:
-            
-            1. **نسخة الأندرويد (`khazna-v2.0.0.apk`)**:
-               - تطبيق أندرويد حقيقي يدعم البصمة البيومترية الحقيقية للجهاز.
-               - اختصار في لوحة الإشعارات / الستارة (Quick Settings Tile) يفتح التطبيق كـ نافذة عائمة (Floating Pop-up).
-               - دعم التثبيت فوق الشاشة (Stay on Top) لسهولة النسخ واللصق في التطبيقات الأخرى.
-            
-            2. **نسخة الكمبيوتر والمتصفح المباشر (`khazna-pc-web-v2.0.0.zip`)**:
-               - فك الضغط وافتح `index.html` أو شغّل `start-khazna.bat` للعمل الفوري بدون أي تثبيت أو إنترنت.
-            
-            3. **إضافة متصفح كروم (`khazna-chrome-extension-v2.0.0.zip`)**:
-               - Manifest V3 جاهز للتثبيت السريع عبر `chrome://extensions/`.
-            
-            ### ✨ الجديد في التحديث 2.0.0:
-            - **إزالة زر التثبيت من الهيدر** (تم نقله للإعدادات للحفاظ على هدوء الشاشة).
-            - **زر النسخ المزدوج**: نسخ اسم المستخدم وكلمة المرور معاً بنقرة واحدة!
-            - **نقل كلمات المرور بين الأقسام**: زر نقل سريع ⇄ في كل بطاقة، ونقل جماعي بالـ multi-select.
-            - **ثيمات مخصصة لكل قسم**: خلفيات زجاجية ملونة وتأثيرات ضوئية مميزة لكل قسم.
-            - **عرض منظم وأشيك لكلمات المرور**: تجميع أنيق حسب الأقسام مع إمكانية طي وتوسيع كل قسم، وبانر هيرو خاص عند تصفية أي قسم.
+
+            ---
+
+            ### 📱 نسخة الأندرويد (`khazna-${{ github.ref_name }}.apk`)
+            - **بصمة أندرويد حقيقية** بـ BiometricPrompt + AndroidKeyStore (AES-256-GCM) — صفر تسريب.
+            - **Quick Settings Tile** في لوحة الإشعارات يفتح التطبيق كـ نافذة عائمة (Floating Overlay).
+            - **دعم التثبيت فوق الشاشة** لسهولة النسخ واللصق أثناء استخدام تطبيقات أخرى.
+            - **زر نسخ مزدوج** ينسخ اسم المستخدم وكلمة المرور معاً بنقرة واحدة.
+            - **نقل كلمات المرور بين الأقسام** مع ثيمات مخصصة لكل قسم.
+
+            > **تثبيت APK**: قد تحتاج تفعيل "تثبيت من مصادر غير معروفة" في إعدادات الأندرويد.
+
+            ---
+
+            ### 💻 نسخة PC المباشرة — ملف واحد! (`khazna.html`)
+            - **انقر مرتين على `khazna.html`** في أي متصفح — يعمل فوراً بدون سيرفر أو تثبيت.
+            - أو استخدم `khazna-pc-standalone-${{ github.ref_name }}.zip` (3 ملفات: index.html + CSS + JS).
+
+            ---
+
+            ### 🔵 إضافة متصفح كروم (`khazna-chrome-extension-${{ github.ref_name }}.zip`)
+            - Manifest V3 جاهز للتثبيت عبر `chrome://extensions/` → Load unpacked.
+
+            ---
+
+            ### ✨ جديد في هذا الإصدار:
+            - ✅ **بصمة أندرويد حقيقية** (BiometricPrompt + Android Keystore) — مختلفة عن WebAuthn تماماً
+            - ✅ **Quick Settings Tile** + نافذة عائمة عند الوصول من الإشعارات
+            - ✅ **نسخة PC ملف واحد** بدون سيرفر محلي
+            - ✅ **زر النسخ المزدوج** (يوزر + باسوورد معاً)
+            - ✅ **نقل الباسوردات بين الأقسام** مع ثيمات مخصصة
+            - ✅ **عرض منظم بالأقسام** مع طي/توسيع وبانر هيرو لكل قسم
+
           files: |
-            dist/khazna-v2.0.0.apk
-            dist/khazna-pc-web-v2.0.0.zip
-            dist/khazna-chrome-extension-v2.0.0.zip
+            dist/khazna-${{ github.ref_name }}.apk
+            dist/khazna.html
+            dist/khazna-pc-standalone-${{ github.ref_name }}.zip
+            dist/khazna-pc-web-${{ github.ref_name }}.zip
+            dist/khazna-chrome-extension-${{ github.ref_name }}.zip

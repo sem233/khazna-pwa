@@ -216,7 +216,19 @@ export async function deriveKeyBytes(password, salt, spec, opts = {}) {
 
 function runInKdfWorker(password, salt, spec, opts) {
   return new Promise((resolve, reject) => {
-    const workerUrl = new URL('./kdf-worker.js', import.meta.url);
+    let workerUrl;
+    try {
+      workerUrl =
+        typeof import.meta !== 'undefined' && import.meta?.url
+          ? new URL('./kdf-worker.js', import.meta.url)
+          : null;
+    } catch {
+      workerUrl = null;
+    }
+    if (!workerUrl) {
+      deriveKeyBytesDirect(password, salt, spec, opts).then(resolve, reject);
+      return;
+    }
     const worker = new Worker(workerUrl, { type: 'module' });
     const pwdBytes = typeof password === 'string' ? utf8Encode(password) : new Uint8Array(password);
     const saltCopy = new Uint8Array(salt);
