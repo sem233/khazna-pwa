@@ -557,27 +557,206 @@
 .entry-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .entry-card {
-  background: var(--bg-glass);
+  background: var(--sec-bg-tint, var(--bg-glass));
   backdrop-filter: var(--blur-md);
   -webkit-backdrop-filter: var(--blur-md);
-  border: 1px solid var(--border-hairline);
+  border: 1px solid var(--sec-border, var(--border-hairline));
   border-inline-start: 4px solid var(--sec-accent, var(--accent));
   border-radius: var(--radius-md);
-  padding: 14px;
+  padding: 15px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  box-shadow: var(--shadow-glass);
-  transition: border-color 0.16s ease, transform 0.16s ease;
+  gap: 12px;
+  box-shadow: var(--sec-glow, var(--shadow-glass));
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  position: relative;
+}
+
+.entry-card:hover {
+  border-color: var(--sec-accent, var(--border-focus));
+  box-shadow: 0 12px 28px -8px var(--sec-glow-hover, rgba(56, 189, 248, 0.25));
+  transform: translateY(-1px);
 }
 
 .entry-card.is-selected {
   border-color: var(--accent);
   background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* --- Section Grouped View --- */
+.section-group {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--sec-border, var(--border-hairline));
+  background: var(--sec-bg-tint, var(--bg-glass));
+  box-shadow: var(--sec-glow, var(--shadow-glass));
+  overflow: hidden;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.section-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--sec-header-bg, rgba(15, 23, 42, 0.65));
+  border-bottom: 1px solid var(--sec-border, var(--border-hairline));
+  cursor: pointer;
+  user-select: none;
+  gap: 10px;
+}
+
+.section-group-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.section-group-emoji {
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.section-group-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.section-group-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--sec-badge-bg, rgba(148, 163, 184, 0.2));
+  color: var(--sec-badge-color, var(--text-secondary));
+  flex-shrink: 0;
+}
+
+.section-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.section-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.section-group.is-collapsed .section-group-body {
+  display: none;
+}
+
+.section-group.is-collapsed .section-group-header {
+  border-bottom: none;
+}
+
+.section-hero-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--sec-border, var(--border-hairline));
+  background: var(--sec-header-bg, var(--bg-glass));
+  box-shadow: var(--sec-glow, var(--shadow-glass));
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.section-hero-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-hero-emoji {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.section-hero-text h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.section-hero-text p {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* Dual copy button & Move button styling */
+.btn-dual-copy {
+  background: linear-gradient(135deg, var(--sec-accent, var(--accent)), #6366f1);
+  color: #ffffff;
+  border: none;
+  font-weight: 700;
+  box-shadow: 0 4px 12px -2px rgba(56, 189, 248, 0.4);
+}
+.btn-dual-copy:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-move-sec {
+  background: var(--bg-input);
+  border-color: var(--border-hairline);
+  color: var(--text-secondary);
+}
+.btn-move-sec:hover {
+  border-color: var(--sec-accent, var(--accent));
+  color: var(--sec-accent, var(--accent));
+}
+
+/* Overlay / Popup Mode for Android Notification Tile & Floating Window */
+.overlay-mode body {
+  background: rgba(7, 11, 20, 0.98);
+}
+
+.overlay-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+  max-width: 480px;
+  margin: 0 auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+}
+
+.overlay-pin-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg-glass-strong);
+  border-bottom: 1px solid var(--border-hairline);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 
 .entry-top {

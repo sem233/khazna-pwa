@@ -1,0 +1,20 @@
+{
+  "appId": "com.khazna.passwordmanager",
+  "appName": "خزنة",
+  "webDir": "../",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "hostname": "khazna.app"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "backgroundColor": "#070b14"
+    },
+    "StatusBar": {
+      "style": "dark",
+      "backgroundColor": "#070b14"
+    }
+  }
+}

@@ -189,6 +189,18 @@ export function renderPasswordsView({
             'button',
             {
               type: 'button',
+              class: 'btn btn-sm btn-primary',
+              onClick: () => {
+                openBulkMoveSheet({ session, lang, selectedIds, sections: sortedSections, onStateChange, onRefresh });
+              },
+            },
+            svgIcon('link', 14),
+            t(lang, 'moveToSection')
+          ),
+          el(
+            'button',
+            {
+              type: 'button',
               class: 'btn btn-sm btn-danger',
               onClick: async () => {
                 for (const id of selectedIds) {
@@ -227,6 +239,50 @@ export function renderPasswordsView({
     sortBy: state.sortBy,
   });
 
+  // Hero banner when filtering by a single section
+  if (!state.showTrash && !state.favoritesOnly && !state.duplicatesOnly && state.sectionId !== 'all') {
+    const activeSec = sectionById.get(state.sectionId);
+    if (activeSec) {
+      const ad = activeSec.data || {};
+      const accentCls = accentClassForHex(ad.color);
+      container.appendChild(
+        el(
+          'div',
+          { class: `section-hero-banner ${accentCls}` },
+          el(
+            'div',
+            { class: 'section-hero-info' },
+            el('span', { class: 'section-hero-emoji' }, ad.emoji || '📁'),
+            el(
+              'div',
+              { class: 'section-hero-text' },
+              el('h2', null, ad.name || ''),
+              el('p', null, `${visibleEntries.length} ${t(lang, 'navPasswords')}`)
+            )
+          ),
+          el(
+            'button',
+            {
+              type: 'button',
+              class: 'btn btn-sm btn-primary',
+              onClick: () => {
+                openPasswordEditorSheet({
+                  session,
+                  lang,
+                  sections: sortedSections,
+                  defaultSectionId: activeSec.id,
+                  onSaved: onRefresh,
+                });
+              },
+            },
+            svgIcon('plus', 14),
+            t(lang, 'addEntry')
+          )
+        )
+      );
+    }
+  }
+
   const listWrap = el('div', { class: 'entry-list', 'data-testid': 'password-list' });
 
   if (visibleEntries.length === 0) {
@@ -260,43 +316,119 @@ export function renderPasswordsView({
       }
     }
 
-    for (const [, { section, entries }] of groups) {
-      const sd = section.data || {};
+    // Sort groups in section order
+    for (const sec of sortedSections) {
+      const g = groups.get(sec.id);
+      if (!g || g.entries.length === 0) continue;
+      const sd = sec.data || {};
       const accentCls = accentClassForHex(sd.color);
+
+      const toggleArrow = el('span', { class: 'count-badge' }, '▼');
+      const groupBody = el('div', { class: 'section-group-body' });
+      for (const entry of g.entries) {
+        groupBody.appendChild(
+          buildEntryCard({
+            entry,
+            sectionById,
+            selectedIds,
+            state,
+            session,
+            lang,
+            sortedSections,
+            copyField,
+            onStateChange,
+            onRefresh,
+            onShowTwoStepBar,
+          })
+        );
+      }
+
+      const groupWrap = el('div', { class: `section-group ${accentCls}` });
 
       const groupHeader = el(
         'div',
-        { class: `section-group-header ${accentCls}` },
-        el('span', { class: 'section-group-emoji' }, sd.emoji || '📁'),
-        el('span', { class: 'section-group-name' }, sd.name || ''),
-        el('span', { class: 'count-badge' }, String(entries.length))
+        {
+          class: 'section-group-header',
+          onClick: () => {
+            const isColl = groupWrap.classList.toggle('is-collapsed');
+            toggleArrow.textContent = isColl ? '▲' : '▼';
+          },
+        },
+        el(
+          'div',
+          { class: 'section-group-title-wrap' },
+          el('span', { class: 'section-group-emoji' }, sd.emoji || '📁'),
+          el('span', { class: 'section-group-title' }, sd.name || ''),
+          el('span', { class: 'section-group-badge' }, String(g.entries.length))
+        ),
+        el('div', { class: 'section-group-actions' }, toggleArrow)
       );
 
-      const groupBody = el('div', { class: 'section-group-body' });
-      for (const entry of entries) {
-        groupBody.appendChild(buildEntryCard({ entry, sectionById, selectedIds, state, session, lang, sortedSections, copyField, onStateChange, onRefresh, onShowTwoStepBar }));
-      }
-
-      listWrap.appendChild(el('div', { class: `section-group ${accentCls}` }, groupHeader, groupBody));
+      groupWrap.appendChild(groupHeader);
+      groupWrap.appendChild(groupBody);
+      listWrap.appendChild(groupWrap);
     }
 
     if (uncategorized.length > 0) {
       const groupBody = el('div', { class: 'section-group-body' });
       for (const entry of uncategorized) {
-        groupBody.appendChild(buildEntryCard({ entry, sectionById, selectedIds, state, session, lang, sortedSections, copyField, onStateChange, onRefresh, onShowTwoStepBar }));
+        groupBody.appendChild(
+          buildEntryCard({
+            entry,
+            sectionById,
+            selectedIds,
+            state,
+            session,
+            lang,
+            sortedSections,
+            copyField,
+            onStateChange,
+            onRefresh,
+            onShowTwoStepBar,
+          })
+        );
       }
-      listWrap.appendChild(el('div', { class: 'section-group' },
-        el('div', { class: 'section-group-header' },
+      const groupWrap = el('div', { class: 'section-group' });
+      const toggleArrow = el('span', { class: 'count-badge' }, '▼');
+      const groupHeader = el(
+        'div',
+        {
+          class: 'section-group-header',
+          onClick: () => {
+            const isColl = groupWrap.classList.toggle('is-collapsed');
+            toggleArrow.textContent = isColl ? '▲' : '▼';
+          },
+        },
+        el(
+          'div',
+          { class: 'section-group-title-wrap' },
           el('span', { class: 'section-group-emoji' }, '📁'),
-          el('span', { class: 'section-group-name' }, lang === 'en' ? 'Uncategorized' : 'غير مصنّف'),
-          el('span', { class: 'count-badge' }, String(uncategorized.length))
+          el('span', { class: 'section-group-title' }, lang === 'en' ? 'Uncategorized' : 'غير مصنّف'),
+          el('span', { class: 'section-group-badge' }, String(uncategorized.length))
         ),
-        groupBody
-      ));
+        el('div', { class: 'section-group-actions' }, toggleArrow)
+      );
+      groupWrap.appendChild(groupHeader);
+      groupWrap.appendChild(groupBody);
+      listWrap.appendChild(groupWrap);
     }
   } else {
     for (const entry of visibleEntries) {
-      listWrap.appendChild(buildEntryCard({ entry, sectionById, selectedIds, state, session, lang, sortedSections, copyField, onStateChange, onRefresh, onShowTwoStepBar }));
+      listWrap.appendChild(
+        buildEntryCard({
+          entry,
+          sectionById,
+          selectedIds,
+          state,
+          session,
+          lang,
+          sortedSections,
+          copyField,
+          onStateChange,
+          onRefresh,
+          onShowTwoStepBar,
+        })
+      );
     }
   }
 
@@ -304,308 +436,435 @@ export function renderPasswordsView({
   return container;
 }
 
-function buildEntryCard({ entry, sectionById, selectedIds, state, session, lang, sortedSections, copyField, onStateChange, onRefresh, onShowTwoStepBar }) {
+function buildEntryCard({
+  entry,
+  sectionById,
+  selectedIds,
+  state,
+  session,
+  lang,
+  sortedSections,
+  copyField,
+  onStateChange,
+  onRefresh,
+  onShowTwoStepBar,
+}) {
   const d = entry.data || {};
   const sec = sectionById.get(d.sectionId);
   const accentCls = accentClassForHex(sec?.data?.color);
   const isSelected = selectedIds.has(entry.id);
-    const sec = sectionById.get(d.sectionId);
-    const accentCls = accentClassForHex(sec?.data?.color);
-    const isSelected = selectedIds.has(entry.id);
 
-    const card = el('article', {
-      class: `entry-card stagger-item ${accentCls} ${isSelected ? 'is-selected' : ''}`.trim(),
-      'data-entry-id': entry.id,
-    });
+  const card = el('article', {
+    class: `entry-card stagger-item ${accentCls} ${isSelected ? 'is-selected' : ''}`.trim(),
+    'data-entry-id': entry.id,
+  });
 
-    // Long-press multi-select support (mobile)
-    let longPressTimer = null;
-    card.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button, input, a')) return;
-      longPressTimer = setTimeout(() => {
-        triggerHaptic(24);
-        const next = new Set(selectedIds);
-        if (next.has(entry.id)) next.delete(entry.id);
-        else next.add(entry.id);
-        onStateChange({ selectedIds: next });
-      }, 500);
-    });
-    const cancelLongPress = () => {
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-      }
-    };
-    card.addEventListener('pointerup', cancelLongPress);
-    card.addEventListener('pointercancel', cancelLongPress);
-    card.addEventListener('pointermove', cancelLongPress);
+  // Long-press multi-select support (mobile)
+  let longPressTimer = null;
+  card.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button, input, a')) return;
+    longPressTimer = setTimeout(() => {
+      triggerHaptic(24);
+      const next = new Set(selectedIds);
+      if (next.has(entry.id)) next.delete(entry.id);
+      else next.add(entry.id);
+      onStateChange({ selectedIds: next });
+    }, 500);
+  });
+  const cancelLongPress = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+  };
+  card.addEventListener('pointerup', cancelLongPress);
+  card.addEventListener('pointercancel', cancelLongPress);
+  card.addEventListener('pointermove', cancelLongPress);
 
-    const favBtn = el(
-      'button',
-      {
-        type: 'button',
-        class: 'btn btn-icon btn-ghost',
-        'aria-label': `${t(lang, 'favorites')} ${d.title}`,
-        onClick: async () => {
-          await session.saveRecord({
-            id: entry.id,
-            type: 'password',
-            data: { ...d, favorite: !d.favorite },
-            createdAt: entry.createdAt,
-          });
-          await onRefresh();
-        },
+  const favBtn = el(
+    'button',
+    {
+      type: 'button',
+      class: 'btn btn-icon btn-ghost',
+      'aria-label': `${t(lang, 'favorites')} ${d.title}`,
+      onClick: async () => {
+        await session.saveRecord({
+          id: entry.id,
+          type: 'password',
+          data: { ...d, favorite: !d.favorite },
+          createdAt: entry.createdAt,
+        });
+        await onRefresh();
       },
-      svgIcon('star', 18, Boolean(d.favorite))
-    );
+    },
+    svgIcon('star', 18, Boolean(d.favorite))
+  );
 
-    const topRow = el(
+  const topRow = el(
+    'div',
+    { class: 'entry-top' },
+    el(
       'div',
-      { class: 'entry-top' },
+      { class: 'entry-title-group' },
+      el(
+        'h3',
+        { class: 'entry-title' },
+        el('span', null, sec?.data?.emoji || '🔐'),
+        el('span', null, d.title || 'Untitled')
+      ),
+      d.url ? el('p', { class: 'entry-sub ltr-value' }, d.url) : null
+    ),
+    !state.showTrash ? favBtn : null
+  );
+
+  const fieldsBox = el('div', { class: 'entry-fields' });
+
+  if (d.username) {
+    fieldsBox.appendChild(
       el(
         'div',
-        { class: 'entry-title-group' },
+        { class: 'secret-field-row' },
         el(
-          'h3',
-          { class: 'entry-title' },
-          el('span', null, sec?.data?.emoji || '🔐'),
-          el('span', null, d.title || 'Untitled')
+          'div',
+          { class: 'secret-field-meta' },
+          el('span', { class: 'secret-field-label' }, t(lang, 'usernameLabel')),
+          el('span', { class: 'secret-field-val ltr-value' }, d.username)
         ),
-        d.url ? el('p', { class: 'entry-sub ltr-value' }, d.url) : null
-      ),
-      !state.showTrash ? favBtn : null
-    );
-
-    const fieldsBox = el('div', { class: 'entry-fields' });
-
-    if (d.username) {
-      fieldsBox.appendChild(
-        el(
-          'div',
-          { class: 'secret-field-row' },
-          el(
-            'div',
-            { class: 'secret-field-meta' },
-            el('span', { class: 'secret-field-label' }, t(lang, 'usernameLabel')),
-            el('span', { class: 'secret-field-val ltr-value' }, d.username)
-          ),
-          el(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-sm',
-              'aria-label': `${t(lang, 'copyUser')} ${d.title}`,
-              onClick: () => copyField(d.username, t(lang, 'usernameLabel')),
-            },
-            svgIcon('copy', 15),
-            t(lang, 'copyUser')
-          )
-        )
-      );
-    }
-
-    if (d.password) {
-      const maskedText = '••••••••••••';
-      const pwdSpan = el('span', { class: 'secret-field-val ltr-value' }, maskedText);
-      const revealBtn = el(
-        'button',
-        {
-          type: 'button',
-          class: 'btn btn-icon btn-sm',
-          'aria-label': `${t(lang, 'holdToReveal')} ${d.title}`,
-          title: t(lang, 'holdToReveal'),
-        },
-        svgIcon('eye', 16)
-      );
-      attachHoldToReveal(revealBtn, {
-        onReveal: () => { pwdSpan.textContent = d.password; },
-        onHide: () => { pwdSpan.textContent = maskedText; },
-        autoHideMs: 10000,
-      });
-
-      fieldsBox.appendChild(
-        el(
-          'div',
-          { class: 'secret-field-row' },
-          el(
-            'div',
-            { class: 'secret-field-meta' },
-            el('span', { class: 'secret-field-label' }, t(lang, 'passwordLabel')),
-            pwdSpan
-          ),
-          revealBtn,
-          el(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-sm',
-              'aria-label': `${t(lang, 'copyPass')} ${d.title}`,
-              onClick: () => copyField(d.password, t(lang, 'passwordLabel')),
-            },
-            svgIcon('copy', 15),
-            t(lang, 'copyPass')
-          )
-        )
-      );
-    }
-
-    if (d.url) {
-      fieldsBox.appendChild(
-        el(
-          'div',
-          { class: 'secret-field-row' },
-          el(
-            'div',
-            { class: 'secret-field-meta' },
-            el('span', { class: 'secret-field-label' }, t(lang, 'urlLabel')),
-            el('span', { class: 'secret-field-val ltr-value' }, d.url)
-          ),
-          el(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-sm',
-              'aria-label': `${t(lang, 'copyUrl')} ${d.title}`,
-              onClick: () => copyField(d.url, t(lang, 'urlLabel')),
-            },
-            svgIcon('copy', 15)
-          )
-        )
-      );
-    }
-
-    if (d.notes) {
-      fieldsBox.appendChild(
-        el(
-          'div',
-          { class: 'secret-field-row' },
-          el(
-            'div',
-            { class: 'secret-field-meta' },
-            el('span', { class: 'secret-field-label' }, t(lang, 'notesLabel')),
-            el('span', { class: 'secret-field-val' }, d.notes)
-          ),
-          el(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-sm',
-              'aria-label': `${t(lang, 'copyNotes')} ${d.title}`,
-              onClick: () => copyField(d.notes, t(lang, 'notesLabel')),
-            },
-            svgIcon('copy', 15)
-          )
-        )
-      );
-    }
-
-    const actionsRow = el('div', { class: 'entry-actions-row' });
-
-    if (state.showTrash) {
-      actionsRow.appendChild(
-        el(
-          'button',
-          {
-            type: 'button',
-            class: 'btn btn-sm btn-primary',
-            onClick: async () => {
-              await session.restoreRecord(entry.id);
-              await onRefresh();
-            },
-          },
-          t(lang, 'restore')
-        )
-      );
-      actionsRow.appendChild(
-        el(
-          'button',
-          {
-            type: 'button',
-            class: 'btn btn-sm btn-danger',
-            onClick: async () => {
-              await session.permanentlyDeleteRecord(entry.id);
-              await onRefresh();
-            },
-          },
-          t(lang, 'deleteForever')
-        )
-      );
-    } else {
-      if (d.username && d.password) {
-        actionsRow.appendChild(
-          el(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-sm btn-primary',
-              title: t(lang, 'copyBothNow'),
-              onClick: async () => {
-                // Always copy both username and password together immediately
-                try {
-                  const clearSec = session.settings?.clipboardClearSec ?? 30;
-                  const combined = `${d.username}\t${d.password}`;
-                  await session.clipboard.copySecret(combined, clearSec);
-                  triggerHaptic();
-                  showToast(t(lang, 'copiedUserAndPass'), 'success');
-                } catch (err) {
-                  showToast(formatError(err, lang), 'error');
-                }
-              },
-            },
-            svgIcon('copy', 15),
-            t(lang, 'copyBothNow')
-          )
-        );
-      }
-
-      actionsRow.appendChild(
         el(
           'button',
           {
             type: 'button',
             class: 'btn btn-sm',
-            'aria-label': `${t(lang, 'edit')} ${d.title}`,
-            onClick: () =>
-              openPasswordEditorSheet({
-                session,
-                lang,
-                sections: sortedSections,
-                entry,
-                onSaved: onRefresh,
-              }),
+            'aria-label': `${t(lang, 'copyUser')} ${d.title}`,
+            onClick: () => copyField(d.username, t(lang, 'usernameLabel')),
           },
-          svgIcon('edit', 15),
-          t(lang, 'edit')
+          svgIcon('copy', 15),
+          t(lang, 'copyUser')
         )
-      );
+      )
+    );
+  }
 
+  if (d.password) {
+    const maskedText = '••••••••••••';
+    const pwdSpan = el('span', { class: 'secret-field-val ltr-value' }, maskedText);
+    const revealBtn = el(
+      'button',
+      {
+        type: 'button',
+        class: 'btn btn-icon btn-sm',
+        'aria-label': `${t(lang, 'holdToReveal')} ${d.title}`,
+        title: t(lang, 'holdToReveal'),
+      },
+      svgIcon('eye', 16)
+    );
+    attachHoldToReveal(revealBtn, {
+      onReveal: () => {
+        pwdSpan.textContent = d.password;
+      },
+      onHide: () => {
+        pwdSpan.textContent = maskedText;
+      },
+      autoHideMs: 10000,
+    });
+
+    fieldsBox.appendChild(
+      el(
+        'div',
+        { class: 'secret-field-row' },
+        el(
+          'div',
+          { class: 'secret-field-meta' },
+          el('span', { class: 'secret-field-label' }, t(lang, 'passwordLabel')),
+          pwdSpan
+        ),
+        revealBtn,
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'btn btn-sm',
+            'aria-label': `${t(lang, 'copyPass')} ${d.title}`,
+            onClick: () => copyField(d.password, t(lang, 'passwordLabel')),
+          },
+          svgIcon('copy', 15),
+          t(lang, 'copyPass')
+        )
+      )
+    );
+  }
+
+  if (d.url) {
+    fieldsBox.appendChild(
+      el(
+        'div',
+        { class: 'secret-field-row' },
+        el(
+          'div',
+          { class: 'secret-field-meta' },
+          el('span', { class: 'secret-field-label' }, t(lang, 'urlLabel')),
+          el('span', { class: 'secret-field-val ltr-value' }, d.url)
+        ),
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'btn btn-sm',
+            'aria-label': `${t(lang, 'copyUrl')} ${d.title}`,
+            onClick: () => copyField(d.url, t(lang, 'urlLabel')),
+          },
+          svgIcon('copy', 15)
+        )
+      )
+    );
+  }
+
+  if (d.notes) {
+    fieldsBox.appendChild(
+      el(
+        'div',
+        { class: 'secret-field-row' },
+        el(
+          'div',
+          { class: 'secret-field-meta' },
+          el('span', { class: 'secret-field-label' }, t(lang, 'notesLabel')),
+          el('span', { class: 'secret-field-val' }, d.notes)
+        ),
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'btn btn-sm',
+            'aria-label': `${t(lang, 'copyNotes')} ${d.title}`,
+            onClick: () => copyField(d.notes, t(lang, 'notesLabel')),
+          },
+          svgIcon('copy', 15)
+        )
+      )
+    );
+  }
+
+  const actionsRow = el('div', { class: 'entry-actions-row' });
+
+  if (state.showTrash) {
+    actionsRow.appendChild(
+      el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-sm btn-primary',
+          onClick: async () => {
+            await session.restoreRecord(entry.id);
+            await onRefresh();
+          },
+        },
+        t(lang, 'restore')
+      )
+    );
+    actionsRow.appendChild(
+      el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-sm btn-danger',
+          onClick: async () => {
+            await session.permanentlyDeleteRecord(entry.id);
+            await onRefresh();
+          },
+        },
+        t(lang, 'deleteForever')
+      )
+    );
+  } else {
+    // ⊞ Dual Copy Button — Copies username + password together immediately
+    if (d.username && d.password) {
       actionsRow.appendChild(
         el(
           'button',
           {
             type: 'button',
-            class: 'btn btn-sm btn-danger',
-            'aria-label': `${t(lang, 'delete')} ${d.title}`,
+            class: 'btn btn-sm btn-dual-copy',
+            'aria-label': `${t(lang, 'copyBothNow')} ${d.title}`,
+            title: t(lang, 'copyBothNow'),
             onClick: async () => {
-              await session.trashRecord(entry.id);
-              showToast(t(lang, 'moveToTrash'), 'info');
-              await onRefresh();
+              try {
+                const clearSec = session.settings?.clipboardClearSec ?? 30;
+                const combined = `${d.username}\n${d.password}`;
+                await session.clipboard.copySecret(combined, clearSec);
+                triggerHaptic();
+                showToast(t(lang, 'copiedUserAndPass'), 'success');
+              } catch (err) {
+                showToast(formatError(err, lang), 'error');
+              }
             },
           },
-          svgIcon('trash', 15),
-          t(lang, 'delete')
+          svgIcon('copy', 15),
+          t(lang, 'copyBothNow')
         )
       );
     }
 
-    card.appendChild(topRow);
-    card.appendChild(fieldsBox);
-    card.appendChild(actionsRow);
-    listWrap.appendChild(card);
+    // ⇄ Quick Move Section Button
+    actionsRow.appendChild(
+      el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-sm btn-move-sec',
+          'aria-label': `${t(lang, 'moveToSection')} ${d.title}`,
+          title: t(lang, 'moveToSection'),
+          onClick: () => {
+            openMoveEntrySheet({ session, lang, entry, sections: sortedSections, onRefresh });
+          },
+        },
+        svgIcon('link', 14),
+        t(lang, 'moveToSection')
+      )
+    );
+
+    // ✎ Edit Button
+    actionsRow.appendChild(
+      el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-sm',
+          'aria-label': `${t(lang, 'edit')} ${d.title}`,
+          onClick: () =>
+            openPasswordEditorSheet({
+              session,
+              lang,
+              sections: sortedSections,
+              entry,
+              onSaved: onRefresh,
+            }),
+        },
+        svgIcon('edit', 15),
+        t(lang, 'edit')
+      )
+    );
+
+    // 🗑 Delete Button
+    actionsRow.appendChild(
+      el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-sm btn-danger',
+          'aria-label': `${t(lang, 'delete')} ${d.title}`,
+          onClick: async () => {
+            await session.trashRecord(entry.id);
+            showToast(t(lang, 'moveToTrash'), 'info');
+            await onRefresh();
+          },
+        },
+        svgIcon('trash', 15),
+        t(lang, 'delete')
+      )
+    );
   }
 
-  container.appendChild(listWrap);
-  return container;
+  card.appendChild(topRow);
+  card.appendChild(fieldsBox);
+  card.appendChild(actionsRow);
+  return card;
+}
+
+/**
+ * Bottom sheet to quickly move an entry to another section
+ */
+function openMoveEntrySheet({ session, lang, entry, sections, onRefresh }) {
+  const currentSecId = entry?.data?.sectionId;
+  const list = el('div', { class: 'settings-group' });
+
+  for (const s of sections) {
+    const isCurrent = s.id === currentSecId;
+    const accentCls = accentClassForHex(s.data?.color);
+    list.appendChild(
+      el(
+        'button',
+        {
+          type: 'button',
+          class: `btn btn-block ${accentCls} ${isCurrent ? 'is-active' : ''}`.trim(),
+          disabled: isCurrent,
+          onClick: async () => {
+            await session.saveRecord({
+              id: entry.id,
+              type: 'password',
+              createdAt: entry.createdAt,
+              data: {
+                ...entry.data,
+                sectionId: s.id,
+              },
+            });
+            sheet.close();
+            triggerHaptic();
+            showToast(`${t(lang, 'save')} ✓`, 'success');
+            await onRefresh();
+          },
+        },
+        el('span', null, s.data?.emoji || '📁'),
+        el('span', null, s.data?.name || ''),
+        isCurrent ? el('span', { class: 'count-badge' }, '✓') : null
+      )
+    );
+  }
+
+  const sheet = openBottomSheet({
+    title: t(lang, 'moveToSection'),
+    content: list,
+  });
+}
+
+/**
+ * Bottom sheet to move multiple selected entries to another section in bulk
+ */
+function openBulkMoveSheet({ session, lang, selectedIds, sections, onStateChange, onRefresh }) {
+  const list = el('div', { class: 'settings-group' });
+
+  for (const s of sections) {
+    const accentCls = accentClassForHex(s.data?.color);
+    list.appendChild(
+      el(
+        'button',
+        {
+          type: 'button',
+          class: `btn btn-block ${accentCls}`.trim(),
+          onClick: async () => {
+            for (const id of selectedIds) {
+              const rec = await session.storage.getRecord(id);
+              if (rec) {
+                const decrypted = await session.decryptRecord(rec);
+                if (decrypted) {
+                  await session.saveRecord({
+                    id: decrypted.id,
+                    type: 'password',
+                    createdAt: decrypted.createdAt,
+                    data: {
+                      ...decrypted.data,
+                      sectionId: s.id,
+                    },
+                  });
+                }
+              }
+            }
+            sheet.close();
+            triggerHaptic();
+            onStateChange({ selectedIds: new Set() });
+            showToast(`${t(lang, 'save')} ✓`, 'success');
+            await onRefresh();
+          },
+        },
+        el('span', null, s.data?.emoji || '📁'),
+        el('span', null, s.data?.name || '')
+      )
+    );
+  }
+
+  const sheet = openBottomSheet({
+    title: `${t(lang, 'moveToSection')} (${selectedIds.size})`,
+    content: list,
+  });
 }
 
 /**

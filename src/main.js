@@ -57,6 +57,7 @@ const appState = {
   },
   sharedImportText: '',
   pendingSyncCode: '',
+  isOverlayMode: false,
 };
 
 function getLang() {
@@ -489,6 +490,33 @@ function renderApp({ preserveSearchFocus = false } = {}) {
     )
   );
 
+  let overlayBar = null;
+  if (appState.isOverlayMode) {
+    overlayBar = el(
+      'div',
+      { class: 'overlay-pin-bar' },
+      el('span', null, '📌 ' + (lang === 'en' ? 'Khazna Quick Overlay' : 'خزنة — اختصار الوصول السريع فوق الشاشة')),
+      el(
+        'div',
+        { class: 'toolbar-row' },
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'btn btn-sm btn-ghost',
+            onClick: () => {
+              appState.isOverlayMode = false;
+              document.documentElement.classList.remove('overlay-mode');
+              renderApp();
+            },
+          },
+          '✕'
+        )
+      )
+    );
+  }
+
+  if (overlayBar) root.appendChild(overlayBar);
   root.appendChild(header);
   root.appendChild(mainShell);
   if (miniBar) root.appendChild(miniBar);
@@ -739,8 +767,12 @@ async function bootstrap() {
   await session.init();
   applyThemeAndDirection();
 
-  // Check optional PWA share_target query parameter (?shared_text=...)
+  // Check optional PWA share_target query parameter (?shared_text=...) or overlay mode (?overlay=true)
   const params = new URLSearchParams(window.location.search);
+  if (params.get('overlay') === 'true' || window.location.hash.includes('overlay')) {
+    appState.isOverlayMode = true;
+    document.documentElement.classList.add('overlay-mode');
+  }
   const sharedText = params.get('text') || params.get('title') || '';
   if (sharedText) {
     appState.sharedImportText = sharedText;

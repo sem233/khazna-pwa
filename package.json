@@ -1,0 +1,25 @@
+{
+  "name": "khazna",
+  "version": "2.0.0",
+  "description": "خزنة (Khazna) — مدير كلمات مرور محلي ١٠٠٪ بتشفير صفري المعرفة يعمل على الأندرويد والكمبيوتر وإضافة كروم",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node local-server.mjs",
+    "integrity": "node scripts/update-integrity.mjs",
+    "zip": "node scripts/build-release-zips.mjs",
+    "build": "node scripts/update-integrity.mjs && node scripts/build-release-zips.mjs"
+  },
+  "keywords": [
+    "password-manager",
+    "pwa",
+    "zero-knowledge",
+    "argon2id",
+    "aes-256-gcm",
+    "webauthn",
+    "android",
+    "chrome-extension"
+  ],
+  "author": "Osama",
+  "license": "MIT"
+}
