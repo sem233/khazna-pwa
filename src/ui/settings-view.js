@@ -23,6 +23,7 @@ export function renderSettingsView({
   onOpenImportExport,
   onOpenSync,
   onDownloadZip,
+  isNativeAndroid = false,
   onRefresh,
   onApplySettings,
   onActivateUpdate,
@@ -340,7 +341,7 @@ export function renderSettingsView({
     );
   }
 
-  if (!pwaState.isInstalled) {
+  if (!isNativeAndroid && !pwaState.isInstalled) {
     if (pwaState.canInstall) {
       pwaCard.appendChild(
         el('button', { type: 'button', class: 'btn btn-primary btn-block', onClick: onInstallPwa }, svgIcon('download', 17), t(lang, 'installAppBtn'))
@@ -383,7 +384,7 @@ export function renderSettingsView({
       'div',
       { class: 'settings-row' },
       el('span', { class: 'settings-row-title' }, t(lang, 'appVersionLabel')),
-      el('span', { class: 'settings-row-desc ltr-inline mono' }, `v${integrityInfo?.version || '1.0.0'} • ${kdfInfo}`)
+      el('span', { class: 'settings-row-desc ltr-inline mono' }, `v${integrityInfo?.version || '2.2.0'} • ${kdfInfo}`)
     )
   );
   pwaCard.appendChild(
@@ -394,7 +395,23 @@ export function renderSettingsView({
       el('div', { class: 'hash-box', 'data-testid': 'app-shell-hash' }, integrityInfo?.shellSha256 || 'computing...')
     )
   );
-  pwaCard.appendChild(el('div', { class: 'banner banner-warn' }, el('span', null, t(lang, 'screenshotHonesty'))));
+  if (isNativeAndroid) {
+    pwaCard.appendChild(
+      el(
+        'div',
+        { class: 'banner banner-success' },
+        el(
+          'span',
+          null,
+          lang === 'en'
+            ? 'Android FLAG_SECURE active: screenshots and screen recording are blocked by the OS.'
+            : 'حماية الشاشة (FLAG_SECURE) مفعّلة على الأندرويد: لقطات الشاشة والتسجيل محظورة على مستوى النظام.'
+        )
+      )
+    );
+  } else {
+    pwaCard.appendChild(el('div', { class: 'banner banner-warn' }, el('span', null, t(lang, 'screenshotHonesty'))));
+  }
 
   // Danger Zone: Wipe Vault
   pwaCard.appendChild(
@@ -426,12 +443,15 @@ function openBiometricSetupSheet({ session, lang, onDone }) {
   });
   const body = el('div', { class: 'settings-group' });
 
+  const submitBtn = el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, svgIcon('fingerprint', 18), t(lang, 'enableBiometric'));
+
   const form = el(
     'form',
     {
       onSubmit: async (e) => {
         e.preventDefault();
         errBox.classList.add('hidden');
+        submitBtn.disabled = true;
         try {
           const res = await session.enrollBiometricWithPassword(pwdIn.value);
           pwdIn.value = '';
@@ -474,12 +494,13 @@ function openBiometricSetupSheet({ session, lang, onDone }) {
         } catch (err) {
           errBox.textContent = formatError(err, lang);
           errBox.classList.remove('hidden');
+          submitBtn.disabled = false;
         }
       },
     },
     errBox,
     el('div', { class: 'field' }, el('label', { class: 'field-label' }, t(lang, 'masterPasswordLabel')), pwdIn),
-    el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, svgIcon('fingerprint', 18), t(lang, 'enableBiometric'))
+    submitBtn
   );
 
   body.appendChild(form);
@@ -556,8 +577,12 @@ function openRotateRecoverySheet({ session, lang }) {
                 type: 'button',
                 class: 'btn btn-primary btn-block',
                 onClick: async () => {
-                  await navigator.clipboard.writeText(recoveryKeyFormatted);
-                  showToast(t(lang, 'copiedToast'), 'success');
+                  try {
+                    await session.clipboard.copySecret(recoveryKeyFormatted, 0);
+                    showToast(t(lang, 'copiedToast'), 'success');
+                  } catch (err) {
+                    showToast(formatError(err, lang), 'warn');
+                  }
                 },
               },
               svgIcon('copy', 16),

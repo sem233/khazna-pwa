@@ -68,10 +68,13 @@ for (const rel of FILES) {
   }
 }
 
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+const VERSION = pkg.version || '2.2.0';
+
 const shellSha256 = crypto.createHash('sha256').update(shellParts.join('\n')).digest('hex');
 
 const integrityData = {
-  version: '2.0.0',
+  version: VERSION,
   generatedAt: new Date().toISOString(),
   algorithm: 'SHA-256',
   shellSha256,
@@ -85,5 +88,5 @@ fs.writeFileSync(
   'utf8'
 );
 
-console.log(`Updated app-integrity.json (v2.0.0) with ${Object.keys(fileHashes).length} files.`);
+console.log(`Updated app-integrity.json (v${VERSION}) with ${Object.keys(fileHashes).length} files.`);
 console.log(`Shell SHA-256: ${shellSha256}`);

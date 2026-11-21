@@ -5,7 +5,9 @@ import android.content.Intent;
 import android.os.Build;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
+import androidx.annotation.RequiresApi;
 
+@RequiresApi(api = Build.VERSION_CODES.N)
 public class KhaznaTileService extends TileService {
 
     @Override
@@ -15,12 +17,15 @@ public class KhaznaTileService extends TileService {
         if (tile != null) {
             tile.setState(Tile.STATE_ACTIVE);
             tile.setLabel("خزنة سريعة");
-            tile.setContentDescription("فتح خزنة في نافذة عائمة");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                tile.setContentDescription("فتح خزنة في نافذة عائمة");
+            }
             tile.updateTile();
         }
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void onClick() {
         super.onClick();
         Intent intent = new Intent(this, MainActivity.class);

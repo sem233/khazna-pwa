@@ -1,8 +1,8 @@
 package com.khazna.passwordmanager;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
@@ -20,6 +20,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
+import java.util.Arrays;
 import java.util.concurrent.Executor;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -33,7 +34,6 @@ public class NativeBiometricPlugin extends Plugin {
     private static final String KEY_ALIAS_PREFIX = "khazna_bio_key_";
     private static final String PREF_NAME = "khazna_biometric_prefs";
     private static final int GCM_TAG_LENGTH = 128;
-    private static final int GCM_IV_LENGTH = 12;
 
     @PluginMethod
     public void isAvailable(PluginCall call) {
@@ -65,9 +65,15 @@ public class NativeBiometricPlugin extends Plugin {
         String subtitle = call.getString("subtitle", "المس مستشعر البصمة للمتابعة");
         String cancelText = call.getString("cancelText", "إلغاء");
 
-        getActivity().runOnUiThread(() -> {
+        Activity rawActivity = getActivity();
+        if (!(rawActivity instanceof FragmentActivity)) {
+            call.reject("Activity unavailable", "NO_ACTIVITY");
+            return;
+        }
+        FragmentActivity activity = (FragmentActivity) rawActivity;
+
+        activity.runOnUiThread(() -> {
             try {
-                FragmentActivity activity = (FragmentActivity) getActivity();
                 Executor executor = ContextCompat.getMainExecutor(activity);
 
                 BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
@@ -115,12 +121,14 @@ public class NativeBiometricPlugin extends Plugin {
             return;
         }
 
+        byte[] plainBytes = null;
         try {
-            SecretKey secretKey = getOrCreateKey(key);
+            SecretKey secretKey = recreateKey(key);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, secretKey);
             byte[] iv = cipher.getIV();
-            byte[] encrypted = cipher.doFinal(secret.getBytes(StandardCharsets.UTF_8));
+            plainBytes = secret.getBytes(StandardCharsets.UTF_8);
+            byte[] encrypted = cipher.doFinal(plainBytes);
 
             String ivB64 = Base64.encodeToString(iv, Base64.NO_WRAP);
             String encB64 = Base64.encodeToString(encrypted, Base64.NO_WRAP);
@@ -136,6 +144,10 @@ public class NativeBiometricPlugin extends Plugin {
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("Failed to set biometric secret: " + e.getMessage());
+        } finally {
+            if (plainBytes != null) {
+                Arrays.fill(plainBytes, (byte) 0);
+            }
         }
     }
 
@@ -160,9 +172,15 @@ public class NativeBiometricPlugin extends Plugin {
             return;
         }
 
-        getActivity().runOnUiThread(() -> {
+        Activity rawActivity = getActivity();
+        if (!(rawActivity instanceof FragmentActivity)) {
+            call.reject("Activity unavailable", "NO_ACTIVITY");
+            return;
+        }
+        FragmentActivity activity = (FragmentActivity) rawActivity;
+
+        activity.runOnUiThread(() -> {
             try {
-                FragmentActivity activity = (FragmentActivity) getActivity();
                 Executor executor = ContextCompat.getMainExecutor(activity);
 
                 BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
@@ -182,15 +200,20 @@ public class NativeBiometricPlugin extends Plugin {
                     @Override
                     public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
                         super.onAuthenticationSucceeded(result);
+                        byte[] decrypted = null;
                         try {
                             SecretKey secretKey = getKey(key);
+                            if (secretKey == null) {
+                                call.reject("Biometric key invalidated", "KEY_INVALIDATED");
+                                return;
+                            }
                             byte[] iv = Base64.decode(ivB64, Base64.NO_WRAP);
                             byte[] encrypted = Base64.decode(encB64, Base64.NO_WRAP);
 
                             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
                             GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
                             cipher.init(Cipher.DECRYPT_MODE, secretKey, spec);
-                            byte[] decrypted = cipher.doFinal(encrypted);
+                            decrypted = cipher.doFinal(encrypted);
 
                             String secret = new String(decrypted, StandardCharsets.UTF_8);
                             JSObject ret = new JSObject();
@@ -198,7 +221,11 @@ public class NativeBiometricPlugin extends Plugin {
                             ret.put("secret", secret);
                             call.resolve(ret);
                         } catch (Exception e) {
-                            call.reject("Decryption failed: " + e.getMessage());
+                            call.reject("Decryption failed: " + e.getMessage(), "KEY_INVALIDATED");
+                        } finally {
+                            if (decrypted != null) {
+                                Arrays.fill(decrypted, (byte) 0);
+                            }
                         }
                     }
 
@@ -232,33 +259,36 @@ public class NativeBiometricPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    private SecretKey getOrCreateKey(String keyName) throws Exception {
+    private SecretKey recreateKey(String keyName) throws Exception {
         KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
         keyStore.load(null);
         String alias = KEY_ALIAS_PREFIX + keyName;
 
-        if (!keyStore.containsAlias(alias)) {
-            KeyGenerator keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE);
-            KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(
-                alias,
-                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT
-            )
-            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-            .setKeySize(256)
-            .build();
-
-            keyGenerator.init(spec);
-            return keyGenerator.generateKey();
+        if (keyStore.containsAlias(alias)) {
+            keyStore.deleteEntry(alias);
         }
 
-        return (SecretKey) keyStore.getKey(alias, null);
+        KeyGenerator keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE);
+        KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(
+            alias,
+            KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT
+        )
+        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+        .setKeySize(256)
+        .build();
+
+        keyGenerator.init(spec);
+        return keyGenerator.generateKey();
     }
 
     private SecretKey getKey(String keyName) throws Exception {
         KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
         keyStore.load(null);
         String alias = KEY_ALIAS_PREFIX + keyName;
+        if (!keyStore.containsAlias(alias)) {
+            return null;
+        }
         return (SecretKey) keyStore.getKey(alias, null);
     }
 }

@@ -7,35 +7,42 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
 const DIST_DIR = path.join(ROOT, 'dist');
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+const VERSION = pkg.version || '2.2.0';
 
 if (!fs.existsSync(DIST_DIR)) {
   fs.mkdirSync(DIST_DIR, { recursive: true });
 }
 
-console.log('Building release ZIP archives...');
+console.log(`Building release ZIP archives for v${VERSION}...`);
 
-// 1. Chrome Extension ZIP
+// Ensure standalone PC + Chrome Extension bundles are freshly built first
+execSync('node scripts/build-standalone-pc.mjs', { cwd: ROOT, stdio: 'inherit' });
+
 const extDir = path.join(ROOT, 'chrome-extension');
-const extZip = path.join(DIST_DIR, 'khazna-chrome-extension-v2.0.0.zip');
-if (fs.existsSync(extZip)) fs.unlinkSync(extZip);
-
-// 2. PC Web Direct Release ZIP
-const pcZip = path.join(DIST_DIR, 'khazna-pc-web-v2.0.0.zip');
-if (fs.existsSync(pcZip)) fs.unlinkSync(pcZip);
-
-// Also update root khazna-pwa.zip (used by in-app download button)
+const extZip = path.join(DIST_DIR, `khazna-chrome-extension-v${VERSION}.zip`);
+const pcStandaloneDir = path.join(DIST_DIR, 'pc');
+const pcStandaloneZip = path.join(DIST_DIR, `khazna-pc-standalone-v${VERSION}.zip`);
+const pcZip = path.join(DIST_DIR, `khazna-pc-web-v${VERSION}.zip`);
 const rootPwaZip = path.join(ROOT, 'khazna-pwa.zip');
-if (fs.existsSync(rootPwaZip)) fs.unlinkSync(rootPwaZip);
+
+for (const f of [extZip, pcStandaloneZip, pcZip, rootPwaZip]) {
+  if (fs.existsSync(f)) fs.unlinkSync(f);
+}
 
 try {
-  // Compress chrome-extension
   execSync(
     `powershell -Command "Compress-Archive -Path '${extDir}\\*' -DestinationPath '${extZip}' -Force"`,
     { stdio: 'inherit' }
   );
   console.log(`✓ Created ${extZip}`);
 
-  // Files to include in PC Web release
+  execSync(
+    `powershell -Command "Compress-Archive -Path '${pcStandaloneDir}\\*' -DestinationPath '${pcStandaloneZip}' -Force"`,
+    { stdio: 'inherit' }
+  );
+  console.log(`✓ Created ${pcStandaloneZip}`);
+
   const webFiles = [
     'index.html',
     'manifest.webmanifest',
@@ -51,19 +58,18 @@ try {
     'icons',
     'src',
     'vendor',
+    'package.json',
   ];
 
-  const sourcePaths = webFiles.map(f => `'${path.join(ROOT, f)}'`).join(',');
+  const sourcePaths = webFiles.map((f) => `'${path.join(ROOT, f)}'`).join(',');
   execSync(
     `powershell -Command "Compress-Archive -Path ${sourcePaths} -DestinationPath '${pcZip}' -Force"`,
     { stdio: 'inherit' }
   );
   console.log(`✓ Created ${pcZip}`);
 
-  // Copy to root khazna-pwa.zip for in-app download button
   fs.copyFileSync(pcZip, rootPwaZip);
   console.log(`✓ Updated root ${rootPwaZip}`);
-
 } catch (err) {
   console.error('Error creating zip archives:', err);
   process.exit(1);

@@ -8,7 +8,7 @@
  * 3. Full offline usability after first load (cache-first for app shell).
  */
 
-const CACHE_NAME = 'khazna-shell-v1.0.0';
+const CACHE_NAME = 'khazna-shell-v2.2.0';
 
 const APP_SHELL_ASSETS = [
   './',

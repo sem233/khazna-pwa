@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "خزنة (Khazna) — مدير كلمات المرور",
   "short_name": "خزنة",
-  "version": "2.0.0",
-  "description": "مدير كلمات مرور محلي ١٠٠٪ — بياناتك لا تغادر جهازك أبداً",
+  "version": "2.2.0",
+  "description": "مدير كلمات مرور وبطاقات وملاحظات مشفّرة محلي ١٠٠٪ — بياناتك لا تغادر جهازك أبداً",
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
@@ -23,17 +23,9 @@
     "type": "module"
   },
   "permissions": [
-    "storage",
-    "clipboardWrite",
-    "activeTab"
+    "clipboardWrite"
   ],
   "content_security_policy": {
     "extension_pages": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self';"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["popup.html", "popup.js", "popup.css", "icons/*"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }

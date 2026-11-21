@@ -123,7 +123,7 @@ export function renderUnlockView({
             class: 'btn',
             onClick: async () => {
               try {
-                await navigator.clipboard.writeText(pendingRecoveryKey);
+                await session.clipboard.copySecret(pendingRecoveryKey, 0);
                 triggerHaptic();
                 showToast(t(lang, 'copiedToast'), 'success');
               } catch {

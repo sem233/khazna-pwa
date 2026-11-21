@@ -286,8 +286,19 @@ export class VaultStorage {
   }
 
   async withWriteLock(fn) {
-    if (typeof globalThis.navigator?.locks?.request === 'function') {
-      return globalThis.navigator.locks.request(this.lockName, { mode: 'exclusive' }, fn);
+    const isOpaqueOrigin =
+      typeof globalThis.location !== 'undefined' &&
+      (globalThis.location.protocol === 'file:' || globalThis.location.origin === 'null');
+
+    if (!isOpaqueOrigin && typeof globalThis.navigator?.locks?.request === 'function') {
+      try {
+        return await globalThis.navigator.locks.request(this.lockName, { mode: 'exclusive' }, fn);
+      } catch (err) {
+        if (err?.name !== 'SecurityError' && err?.name !== 'NotSupportedError') {
+          throw err;
+        }
+        // Fall through to in-tab queue when LockManager rejects opaque/restricted origins.
+      }
     }
     const prev = this._localQueue;
     let release;

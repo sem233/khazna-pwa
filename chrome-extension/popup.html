@@ -1,14 +1,26 @@
 <!doctype html>
-<html lang="ar" dir="rtl" data-theme="dark">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; font-src 'self';" />
-  <title>خزنة</title>
-  <link rel="stylesheet" href="popup.css" />
-</head>
-<body>
-  <div id="app"></div>
-  <script type="module" src="popup.js"></script>
-</body>
+<html lang="ar" dir="rtl" data-theme="dark" data-chrome-popup="true">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>خزنة (Khazna)</title>
+    <link rel="stylesheet" href="./khazna.bundle.css" />
+  </head>
+  <body>
+<div class="aurora-bg" aria-hidden="true"></div>
+    <div id="app" role="application" aria-label="خزنة — مدير كلمات المرور"></div>
+    <div id="modal-root"></div>
+    <div id="toast-root" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
+    <div id="privacy-overlay" class="privacy-overlay hidden" aria-hidden="true">
+      <div class="auth-hero-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <h2 id="privacy-title">خزنة محمية</h2>
+      <p id="privacy-sub">تم إخفاء المحتوى لحماية خصوصيتك</p>
+    </div>
+    <script src="./khazna.bundle.js"></script>
+  </body>
 </html>

@@ -243,10 +243,26 @@ export function renderCardsView({ session, lang, cards, onRefresh }) {
         ? el('button', { type: 'button', class: 'btn btn-sm', onClick: () => copySecret(d.expiry, t(lang, 'expiryLabel')) }, svgIcon('copy', 14), d.expiry)
         : null,
       d.cvv
-        ? el('button', { type: 'button', class: 'btn btn-sm', onClick: () => copySecret(d.cvv, 'CVV') }, svgIcon('copy', 14), 'CVV')
+        ? el('button', {
+            type: 'button',
+            class: 'btn btn-sm',
+            onClick: async () => {
+              const ok = await requestReauth({ session, lang });
+              if (!ok) return;
+              await copySecret(d.cvv, 'CVV');
+            },
+          }, svgIcon('copy', 14), 'CVV')
         : null,
       d.pin
-        ? el('button', { type: 'button', class: 'btn btn-sm', onClick: () => copySecret(d.pin, 'PIN') }, svgIcon('copy', 14), 'PIN')
+        ? el('button', {
+            type: 'button',
+            class: 'btn btn-sm',
+            onClick: async () => {
+              const ok = await requestReauth({ session, lang });
+              if (!ok) return;
+              await copySecret(d.pin, 'PIN');
+            },
+          }, svgIcon('copy', 14), 'PIN')
         : null,
       el(
         'button',

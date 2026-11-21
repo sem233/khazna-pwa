@@ -29,15 +29,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Run Automated Test Suite
+        run: npm test
+
       - name: Update Integrity & Prepare Web
         run: |
           node scripts/update-integrity.mjs
 
-      # ─── PC Standalone Build ──────────────────────────────────────────────
-      - name: Build PC Standalone (single-file + 3-file)
+      # ─── PC Standalone + Chrome Extension Bundle Build ───────────────────
+      - name: Build PC Standalone & Sync Chrome Extension Bundle
         run: |
           node scripts/build-standalone-pc.mjs
-          # Zip the 3-file PC distribution
           mkdir -p dist
           cd dist/pc && zip -r ../khazna-pc-standalone-${{ github.ref_name }}.zip ./* && cd ../..
           echo "✓ PC standalone zip ready"
@@ -96,7 +98,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
-          tag_name: ${{ github.ref_name || 'v2.1.0' }}
+          tag_name: ${{ github.ref_name || 'v2.2.0' }}
           name: "خزنة (Khazna) ${{ github.ref_name }} — Android APK & PC Standalone & Chrome Extension"
           body: |
             ## 🎉 الإصدار ${{ github.ref_name }} من خزنة (Khazna)
@@ -106,34 +108,31 @@ jobs:
             ---
 
             ### 📱 نسخة الأندرويد (`khazna-${{ github.ref_name }}.apk`)
-            - **بصمة أندرويد حقيقية** بـ BiometricPrompt + AndroidKeyStore (AES-256-GCM) — صفر تسريب.
-            - **Quick Settings Tile** في لوحة الإشعارات يفتح التطبيق كـ نافذة عائمة (Floating Overlay).
-            - **دعم التثبيت فوق الشاشة** لسهولة النسخ واللصق أثناء استخدام تطبيقات أخرى.
-            - **زر نسخ مزدوج** ينسخ اسم المستخدم وكلمة المرور معاً بنقرة واحدة.
-            - **نقل كلمات المرور بين الأقسام** مع ثيمات مخصصة لكل قسم.
-
-            > **تثبيت APK**: قد تحتاج تفعيل "تثبيت من مصادر غير معروفة" في إعدادات الأندرويد.
+            - **بصمة أندرويد حقيقية** بـ BiometricPrompt + AndroidKeyStore (AES-256-GCM) مع التحقق الفوري أثناء التفعيل ودعم إعادة المصادقة للعمليات الحساسة (CVV/PIN/التصدير).
+            - **حماية الشاشة (`FLAG_SECURE`)** لمنع لقطات الشاشة وتسجيل الشاشة + تعطيل `allowBackup` لحماية بيانات البصمة.
+            - **Quick Settings Tile + إشعار الوصول السريع** بأيقونة مخصصة (مع دعم Android 9 إلى Android 15 وطلب إذن الإشعارات تلقائياً) لفتح التطبيق في نافذة عائمة سريعة.
+            - **أبعاد مخصصة للهواتف** دون أي قص أو تمرير أفقي، مع حذف زر ZIP تماماً من شاشة القفل والإعدادات.
 
             ---
 
             ### 💻 نسخة PC المباشرة — ملف واحد! (`khazna.html`)
-            - **انقر مرتين على `khazna.html`** في أي متصفح — يعمل فوراً بدون سيرفر أو تثبيت.
-            - أو استخدم `khazna-pc-standalone-${{ github.ref_name }}.zip` (3 ملفات: index.html + CSS + JS).
+            - **انقر مرتين على `khazna.html`** في أي متصفح — يعمل فوراً عبر `file://` بدون سيرفر محلي أو تثبيت (تم إصلاح `LockManager` والحافظة للعمل المباشر 100%).
+            - أو استخدم `khazna-pc-standalone-${{ github.ref_name }}.zip` (3 ملفات فقط: index.html + CSS + JS).
 
             ---
 
             ### 🔵 إضافة متصفح كروم (`khazna-chrome-extension-${{ github.ref_name }}.zip`)
-            - Manifest V3 جاهز للتثبيت عبر `chrome://extensions/` → Load unpacked.
+            - **خزنة كاملة ومشفّرة داخل إضافة كروم (Manifest V3)** تعمل في النافذة المنبثقة أو تبويب كامل — أوفلاين 100% بدون أي روابط خارجية.
 
             ---
 
-            ### ✨ جديد في هذا الإصدار:
-            - ✅ **بصمة أندرويد حقيقية** (BiometricPrompt + Android Keystore) — مختلفة عن WebAuthn تماماً
-            - ✅ **Quick Settings Tile** + نافذة عائمة عند الوصول من الإشعارات
-            - ✅ **نسخة PC ملف واحد** بدون سيرفر محلي
-            - ✅ **زر النسخ المزدوج** (يوزر + باسوورد معاً)
-            - ✅ **نقل الباسوردات بين الأقسام** مع ثيمات مخصصة
-            - ✅ **عرض منظم بالأقسام** مع طي/توسيع وبانر هيرو لكل قسم
+            ### 🛠️ أبرز الإصلاحات في v2.2.0:
+            - ✅ إصلاح تعطل النقل الجماعي لكلمات المرور بين الأقسام (أصبح ذرياً مع لقطة تراجع تلقائية)
+            - ✅ إصلاح حفظ البيانات عبر `file://` في `khazna.html` على الكمبيوتر
+            - ✅ إصلاح إعادة المصادقة بالبصمة الأصلية على الأندرويد وتنظيف مفاتيح البصمة عند المسح
+            - ✅ إصلاح توافق `KhaznaTileService` مع Android 9/10 وتفعيل وضع النافذة العائمة عند التشغيل البارد
+            - ✅ تحويل إضافة كروم إلى خزنة مشفّرة حقيقية كاملة بدون أي روابط خارجية
+            - ✅ إضافة تعديل لون وأيقونة الأقسام الحالية + اختبارات آلية شاملة (`npm test`)
 
           files: |
             dist/khazna-${{ github.ref_name }}.apk

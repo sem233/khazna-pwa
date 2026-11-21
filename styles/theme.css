@@ -132,7 +132,6 @@ body {
   background: var(--bg-base);
   color: var(--text-primary);
   overflow-x: hidden;
-  padding-top: var(--safe-top);
 }
 
 /* Slowly animated aurora/mesh background */
@@ -186,6 +185,16 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+.clipboard-fallback-ta {
+  position: fixed;
+  top: -9999px;
+  inset-inline-start: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Section accent themes (Zero inline styles, CSP-strict) */

@@ -17,11 +17,11 @@ import { renderStatsView } from './ui/stats-view.js';
 import { openSyncSheet } from './ui/sync-sheet.js';
 import { renderUnlockView } from './ui/unlock-view.js';
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.2.0';
 
 /**
  * Returns true when running inside a real Capacitor Android app.
- * Used to hide browser-only features (download ZIP, WebAuthn prompt, etc.)
+ * Used to hide browser-only features (download ZIP, WebAuthn prompt, SW cache, etc.)
  */
 function isCapacitorAndroid() {
   return (
@@ -30,6 +30,18 @@ function isCapacitorAndroid() {
     window.Capacitor?.isNativePlatform?.() === true &&
     window.Capacitor?.getPlatform?.() === 'android'
   );
+}
+
+function isStandaloneFile() {
+  return typeof window !== 'undefined' && window.location?.protocol === 'file:';
+}
+
+function isChromeExtension() {
+  return typeof window !== 'undefined' && window.location?.protocol === 'chrome-extension:';
+}
+
+function canDownloadZip() {
+  return !isCapacitorAndroid() && !isStandaloneFile() && !isChromeExtension();
 }
 
 const storage = new VaultStorage();
@@ -107,6 +119,13 @@ function applyThemeAndDirection() {
 }
 
 async function computeRuntimeIntegrity() {
+  if (isStandaloneFile() || isChromeExtension()) {
+    appState.integrityInfo = {
+      version: APP_VERSION,
+      shellSha256: isChromeExtension() ? 'chrome-extension-local' : 'standalone-offline-local',
+    };
+    return;
+  }
   try {
     const resp = await fetch('./app-integrity.json', { cache: 'no-store' });
     if (resp.ok) {
@@ -203,8 +222,8 @@ function renderApp({ preserveSearchFocus = false } = {}) {
             withViewTransition(() => renderApp());
           }
         },
-        // Hide ZIP download in native Android — not needed and could confuse users
-        onDownloadZip: isCapacitorAndroid() ? null : handleDownloadZip,
+        // Hide ZIP download in native Android, standalone file://, and Chrome Extension
+        onDownloadZip: canDownloadZip() ? handleDownloadZip : null,
       })
     );
     return;
@@ -226,6 +245,20 @@ function renderApp({ preserveSearchFocus = false } = {}) {
       el(
         'div',
         { class: 'header-actions' },
+        // In Chrome Extension popup, offer quick expand to full browser tab
+        isChromeExtension() && document.documentElement.classList.contains('chrome-popup-mode') && typeof chrome !== 'undefined' && chrome.tabs
+          ? el(
+              'button',
+              {
+                type: 'button',
+                class: 'btn btn-sm',
+                'aria-label': lang === 'en' ? 'Open Full Tab' : 'فتح كامل',
+                title: lang === 'en' ? 'Open Full Tab' : 'فتح في تبويب كامل',
+                onClick: () => chrome.tabs.create({ url: chrome.runtime.getURL('app.html') }),
+              },
+              '↗'
+            )
+          : null,
         // Install button moved to Settings view only
         el(
           'button',
@@ -374,7 +407,8 @@ function renderApp({ preserveSearchFocus = false } = {}) {
             onChanged: refreshAndRender,
           }),
         onOpenSync: () => openDeviceSync('send'),
-        onDownloadZip: handleDownloadZip,
+        onDownloadZip: canDownloadZip() ? handleDownloadZip : null,
+        isNativeAndroid: isCapacitorAndroid(),
         onRefresh: refreshAndRender,
         onApplySettings: () => {
           applyThemeAndDirection();
@@ -653,6 +687,25 @@ function activateWaitingUpdate() {
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
+
+  // Never register SW on file:// or chrome-extension://
+  if (isStandaloneFile() || isChromeExtension()) return;
+
+  // On Capacitor Android, unregister any legacy SW & clear caches so APK updates load fresh bundled files immediately
+  if (isCapacitorAndroid()) {
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      for (const r of regs) r.unregister().catch(() => {});
+    }).catch(() => {});
+    if (typeof caches !== 'undefined') {
+      caches.keys().then((keys) => {
+        for (const k of keys) {
+          if (k.startsWith('khazna-shell-')) caches.delete(k).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+    return;
+  }
+
   window.addEventListener('load', async () => {
     try {
       const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
@@ -783,9 +836,17 @@ async function bootstrap() {
 
   // Check optional PWA share_target query parameter (?shared_text=...) or overlay mode (?overlay=true)
   const params = new URLSearchParams(window.location.search);
-  if (params.get('overlay') === 'true' || window.location.hash.includes('overlay')) {
+  if (
+    params.get('overlay') === 'true' ||
+    window.location.hash.includes('overlay') ||
+    window.__pendingOverlayMode === true
+  ) {
     appState.isOverlayMode = true;
     document.documentElement.classList.add('overlay-mode');
+    window.__pendingOverlayMode = false;
+  }
+  if (params.get('popup') === 'true' || document.documentElement.dataset.chromePopup === 'true') {
+    document.documentElement.classList.add('chrome-popup-mode');
   }
   const sharedText = params.get('text') || params.get('title') || '';
   if (sharedText) {

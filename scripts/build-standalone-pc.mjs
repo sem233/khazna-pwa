@@ -1,14 +1,16 @@
 /**
- * Khazna (خزنة) — Clean PC & Standalone Release Builder
+ * Khazna (خزنة) — Clean PC, Standalone & Chrome Extension Bundle Builder
  *
  * Produces:
  * 1) `dist/pc/`:
- *    - `index.html`: Clean, elegant entrypoint.
+ *    - `index.html`: Clean entrypoint.
  *    - `khazna.bundle.css`: All CSS compiled into one file.
- *    - `khazna.bundle.js`: All JavaScript bundled with esbuild (IIFE, no imports across files).
- *    Works instantly by double-clicking index.html in any browser (file://) or over any static host!
- * 2) `dist/khazna-single.html`:
- *    - 100% single-file self-contained version with lenient meta CSP allowing offline local execution.
+ *    - `khazna.bundle.js`: All JavaScript bundled with esbuild (IIFE, works on file://).
+ * 2) `dist/khazna.html`:
+ *    - 100% single-file self-contained PC version (double-click in browser, no server needed).
+ * 3) `chrome-extension/`:
+ *    - `popup.html`, `app.html`, `khazna.bundle.css`, `khazna.bundle.js`:
+ *      Real, full-featured, 100% offline encrypted vault inside Chrome Extension Manifest V3.
  */
 
 import { execSync } from 'node:child_process';
@@ -24,7 +26,9 @@ async function buildStandalone() {
 
   const distDir = path.join(ROOT, 'dist');
   const pcDir = path.join(distDir, 'pc');
+  const extDir = path.join(ROOT, 'chrome-extension');
   await fs.mkdir(pcDir, { recursive: true });
+  await fs.mkdir(extDir, { recursive: true });
 
   const tempBundlePath = path.join(pcDir, 'khazna.bundle.js');
   const entryPoint = path.join(ROOT, 'src', 'main.js');
@@ -57,7 +61,7 @@ async function buildStandalone() {
   let bodyContent = bodyContentMatch[1];
   bodyContent = bodyContent.replace(/<script[^>]*src=["']\.\/src\/[^"']+["'][^>]*><\/script>/gi, '');
 
-  // 1) PC 2-file / 3-file clean distribution (index.html + khazna.bundle.css + khazna.bundle.js)
+  // 1) PC 3-file clean distribution (index.html + khazna.bundle.css + khazna.bundle.js)
   const pcHtml = `<!doctype html>
 <html lang="ar" dir="rtl" data-theme="dark">
   <head>
@@ -77,7 +81,7 @@ ${bodyContent.trim()}
   await fs.writeFile(path.join(pcDir, 'index.html'), pcHtml, 'utf8');
   console.log(`✓ Clean PC distribution created in: ${pcDir}`);
 
-  // 2) Single-File standalone version (with meta CSP allowing inline)
+  // 2) Single-File standalone version (double-click in browser, no local server required)
   const singleHtml = `<!doctype html>
 <html lang="ar" dir="rtl" data-theme="dark">
   <head>
@@ -85,7 +89,7 @@ ${bodyContent.trim()}
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; font-src 'self'; connect-src 'self';"
+      content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; font-src 'self'; connect-src 'none';"
     />
     <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#070b14" />
@@ -104,6 +108,42 @@ ${bundledJs}
 
   await fs.writeFile(path.join(distDir, 'khazna.html'), singleHtml, 'utf8');
   console.log(`✓ Standalone single-file created: ${path.join(distDir, 'khazna.html')}`);
+
+  // 3) Chrome Extension Manifest V3 real vault (strict CSP — external bundle files, zero inline scripts/styles)
+  await fs.writeFile(path.join(extDir, 'khazna.bundle.css'), combinedCss, 'utf8');
+  await fs.writeFile(path.join(extDir, 'khazna.bundle.js'), bundledJs, 'utf8');
+
+  const extPopupHtml = `<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark" data-chrome-popup="true">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>خزنة (Khazna)</title>
+    <link rel="stylesheet" href="./khazna.bundle.css" />
+  </head>
+  <body>
+${bodyContent.trim()}
+    <script src="./khazna.bundle.js"></script>
+  </body>
+</html>`;
+
+  const extFullHtml = `<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>خزنة (Khazna) — مدير كلمات المرور</title>
+    <link rel="stylesheet" href="./khazna.bundle.css" />
+  </head>
+  <body>
+${bodyContent.trim()}
+    <script src="./khazna.bundle.js"></script>
+  </body>
+</html>`;
+
+  await fs.writeFile(path.join(extDir, 'popup.html'), extPopupHtml, 'utf8');
+  await fs.writeFile(path.join(extDir, 'app.html'), extFullHtml, 'utf8');
+  console.log(`✓ Chrome Extension real vault synced in: ${extDir}`);
 }
 
 buildStandalone().catch((err) => {

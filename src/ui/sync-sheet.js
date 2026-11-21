@@ -147,8 +147,12 @@ export function openSyncSheet({
               payload,
               passphrase: passIn.value,
             });
-            const baseUrl = `${window.location.origin}${window.location.pathname}`;
-            const linkInfo = buildSyncLink(baseUrl, encoded.token);
+            const isWebHost =
+              (window.location.protocol === 'https:' || window.location.protocol === 'http:') &&
+              window.location.origin !== 'null' &&
+              !(window.Capacitor?.isNativePlatform?.());
+            const baseUrl = isWebHost ? `${window.location.origin}${window.location.pathname}` : '';
+            const linkInfo = isWebHost ? buildSyncLink(baseUrl, encoded.token) : { fitsUrl: false, url: '' };
 
             // Mark lastSyncAt on sender so subsequent delta syncs only carry new updates
             await session.updateSettings({ lastSyncAt: new Date().toISOString() });
@@ -169,7 +173,7 @@ export function openSyncSheet({
               )
             );
 
-            if (linkInfo.fitsUrl) {
+            if (isWebHost && linkInfo.fitsUrl) {
               const linkArea = el('textarea', {
                 class: 'textarea ltr-value mono',
                 readonly: true,
@@ -189,7 +193,7 @@ export function openSyncSheet({
                     'data-testid': 'sync-copy-link',
                     onClick: async () => {
                       try {
-                        await navigator.clipboard.writeText(linkInfo.url);
+                        await session.clipboard.copySecret(linkInfo.url, 0);
                         triggerHaptic();
                         showToast(t(lang, 'syncLinkCopied'), 'success');
                       } catch {
@@ -230,7 +234,7 @@ export function openSyncSheet({
                         'data-testid': 'sync-copy-code',
                         onClick: async () => {
                           try {
-                            await navigator.clipboard.writeText(encoded.code);
+                            await session.clipboard.copySecret(encoded.code, 0);
                             triggerHaptic();
                             showToast(t(lang, 'syncCodeCopied'), 'success');
                           } catch {
@@ -252,7 +256,7 @@ export function openSyncSheet({
                 )
               );
               outWrap.appendChild(shareOrCopyRow);
-            } else {
+            } else if (isWebHost) {
               outWrap.appendChild(
                 el('div', { class: 'banner banner-warn' }, el('span', null, t(lang, 'syncTooLargeForLink')))
               );
@@ -279,7 +283,7 @@ export function openSyncSheet({
                     class: 'btn btn-sm',
                     onClick: async () => {
                       try {
-                        await navigator.clipboard.writeText(encoded.code);
+                        await session.clipboard.copySecret(encoded.code, 0);
                         triggerHaptic();
                         showToast(t(lang, 'syncCodeCopied'), 'success');
                       } catch {

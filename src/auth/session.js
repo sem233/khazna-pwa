@@ -76,17 +76,53 @@ export class ClipboardGuard {
     }
   }
 
-  async copySecret(text, clearAfterSec = 30) {
-    const clip = this._env.navigator?.clipboard;
-    if (!clip || typeof clip.writeText !== 'function') {
-      throw new KhaznaError(
-        'CLIPBOARD_UNAVAILABLE',
-        'تعذّر الوصول إلى الحافظة في هذا المتصفح.',
-        'Clipboard API is unavailable.'
-      );
+  async _writeClipboardRaw(value) {
+    const str = String(value);
+    // 1) Capacitor native Clipboard plugin (Android APK)
+    const capClip = this._env.Capacitor?.Plugins?.Clipboard;
+    if (capClip && typeof capClip.write === 'function') {
+      try {
+        await capClip.write({ string: str });
+        return;
+      } catch {
+        // Fall through to web clipboard
+      }
     }
 
-    await clip.writeText(String(text));
+    // 2) Modern Web Clipboard API
+    const clip = this._env.navigator?.clipboard;
+    if (clip && typeof clip.writeText === 'function') {
+      try {
+        await clip.writeText(str);
+        return;
+      } catch {
+        // Fall through to execCommand fallback (e.g. file:// or unfocused WebView)
+      }
+    }
+
+    // 3) Zero-inline-style textarea fallback for file:// / restricted WebViews
+    const doc = this._env.document;
+    if (doc && typeof doc.createElement === 'function' && typeof doc.execCommand === 'function') {
+      const ta = doc.createElement('textarea');
+      ta.className = 'clipboard-fallback-ta';
+      ta.setAttribute('readonly', '');
+      ta.value = str;
+      doc.body.appendChild(ta);
+      ta.select();
+      const ok = doc.execCommand('copy');
+      ta.remove();
+      if (ok) return;
+    }
+
+    throw new KhaznaError(
+      'CLIPBOARD_UNAVAILABLE',
+      'تعذّر الوصول إلى الحافظة في هذا المتصفح.',
+      'Clipboard API is unavailable.'
+    );
+  }
+
+  async copySecret(text, clearAfterSec = 30) {
+    await this._writeClipboardRaw(String(text));
 
     if (this._timer) {
       clearTimeout(this._timer);
@@ -100,7 +136,8 @@ export class ClipboardGuard {
       this._timer = setTimeout(async () => {
         this._timer = null;
         try {
-          if (
+          const capClip = this._env.Capacitor?.Plugins?.Clipboard;
+          if (!capClip &&
             this._env.document &&
             typeof this._env.document.hasFocus === 'function' &&
             !this._env.document.hasFocus()
@@ -108,7 +145,7 @@ export class ClipboardGuard {
             this._emit({ type: 'clear-skipped-unfocused' });
             return;
           }
-          await clip.writeText('');
+          await this._writeClipboardRaw('');
           this._emit({ type: 'cleared' });
         } catch {
           this._emit({ type: 'clear-failed' });
@@ -262,6 +299,14 @@ export class VaultSession {
     const wipeLimit = prev.wipeAfterFailures || 0;
 
     if (wipeLimit > 0 && failedAttempts >= wipeLimit) {
+      const nativePlugin = getNativeBiometricPlugin(this._env);
+      if (nativePlugin && this._header?.vaultId) {
+        try {
+          await nativePlugin.deleteSecret({ key: `khazna_vault_${this._header.vaultId}` });
+        } catch {
+          // ignore cleanup errors during wipe
+        }
+      }
       clearConvenienceRamSession();
       this.#dek = null;
       await this.storage.wipeAll({ wipeSettings: false });
@@ -427,6 +472,15 @@ export class VaultSession {
           cancelText: isAr ? 'كلمة المرور الرئيسية' : 'Master Password',
         });
       } catch (err) {
+        const code = String(err?.code || '');
+        if (code === 'NOT_FOUND' || code === 'KEY_INVALIDATED') {
+          throw new KhaznaError(
+            'BIOMETRIC_INVALIDATED',
+            'تم تغيير إعدادات البصمة على الجهاز. افتح بكلمة المرور الرئيسية ثم أعد تفعيل البصمة من الإعدادات.',
+            'Device biometric key was invalidated. Unlock with Master Password and re-enable biometrics.',
+            err
+          );
+        }
         throw new KhaznaError('BIOMETRIC_CANCELLED', 'تم إلغاء التحقق بالبصمة.', 'Biometric authentication was cancelled.', err);
       }
 
@@ -542,6 +596,20 @@ export class VaultSession {
    */
   async verifyReauth({ masterPassword = null, useBiometric = false, env = this._env } = {}) {
     this._assertUnlocked();
+    const nativePlugin = getNativeBiometricPlugin(env);
+    if (useBiometric && nativePlugin && this._header?.wrappers?.nativeBiometric?.enabled) {
+      const isAr = (this._settings?.lang || 'ar') === 'ar';
+      try {
+        await nativePlugin.authenticate({
+          title: isAr ? 'خزنة — تأكيد الهوية' : 'Khazna — Confirm Identity',
+          subtitle: isAr ? 'المس مستشعر البصمة للمتابعة' : 'Touch the fingerprint sensor to continue',
+          cancelText: isAr ? 'إلغاء' : 'Cancel',
+        });
+        return true;
+      } catch (err) {
+        throw new KhaznaError('BIOMETRIC_CANCELLED', 'تم إلغاء التحقق بالبصمة.', 'Biometric authentication was cancelled.', err);
+      }
+    }
     if (useBiometric && this._header?.wrappers?.webauthn) {
       await verifyBiometricForReauth(this._header, { env });
       return true;
@@ -572,9 +640,29 @@ export class VaultSession {
 
     const nativePlugin = getNativeBiometricPlugin(this._env);
     if (nativePlugin) {
+      const isAr = (this._settings?.lang || 'ar') === 'ar';
+      const avail = await nativePlugin.isAvailable();
+      if (!avail?.isAvailable) {
+        throw new KhaznaError(
+          'BIOMETRIC_UNAVAILABLE',
+          'البصمة غير مفعّلة على جهازك. أضف بصمة في إعدادات الأندرويد أولاً ثم أعد المحاولة.',
+          'Device biometric authentication is not available or no fingerprint is enrolled in Android Settings.'
+        );
+      }
+      try {
+        await nativePlugin.authenticate({
+          title: isAr ? 'خزنة — تفعيل البصمة' : 'Khazna — Enable Biometric',
+          subtitle: isAr ? 'المس مستشعر البصمة لتأكيد التفعيل' : 'Touch the fingerprint sensor to confirm enrollment',
+          cancelText: isAr ? 'إلغاء' : 'Cancel',
+        });
+      } catch (err) {
+        throw new KhaznaError('BIOMETRIC_CANCELLED', 'تم إلغاء تفعيل البصمة.', 'Biometric enrollment was cancelled.', err);
+      }
+
       const rawDekBytes = await this._env.crypto.subtle.exportKey('raw', tempDek);
-      const b64Secret = bytesToBase64(new Uint8Array(rawDekBytes));
-      zeroize(new Uint8Array(rawDekBytes));
+      const rawArr = new Uint8Array(rawDekBytes);
+      const b64Secret = bytesToBase64(rawArr);
+      zeroize(rawArr);
 
       await nativePlugin.setSecret({
         key: `khazna_vault_${this._header.vaultId}`,
@@ -831,12 +919,59 @@ export class VaultSession {
     return envelopes;
   }
 
+  async decryptRecord(envelope) {
+    this._assertUnlocked();
+    if (!envelope) return null;
+    return decryptRecord(this.#dek, envelope, this._header.vaultId);
+  }
+
+  async movePasswordsToSection(ids, targetSectionId) {
+    this._assertUnlocked();
+    const idList = Array.from(ids || []);
+    if (idList.length === 0) return 0;
+
+    const toUpdate = [];
+    for (const id of idList) {
+      const env = await this.storage.getRecord(id);
+      if (!env || env.type !== 'password') continue;
+      const dec = await decryptRecord(this.#dek, env, this._header.vaultId);
+      toUpdate.push({
+        id: dec.id,
+        type: 'password',
+        createdAt: dec.createdAt,
+        updatedAt: new Date().toISOString(),
+        deletedAt: dec.deletedAt ?? null,
+        data: {
+          ...dec.data,
+          sectionId: targetSectionId || null,
+        },
+      });
+    }
+    if (toUpdate.length === 0) return 0;
+
+    const encryptedBatch = await this.encryptBatchForAtomicWrite(toUpdate);
+    await this.storage.atomicOperationWithSnapshot({
+      reason: 'bulk-move-section',
+      putRecords: encryptedBatch,
+    });
+    this.touchActivity();
+    return toUpdate.length;
+  }
+
   async runHealthCheck() {
     this._assertUnlocked();
     return this.storage.runVaultHealthCheck(this.#dek);
   }
 
   async wipeVault() {
+    const nativePlugin = getNativeBiometricPlugin(this._env);
+    if (nativePlugin && this._header?.vaultId) {
+      try {
+        await nativePlugin.deleteSecret({ key: `khazna_vault_${this._header.vaultId}` });
+      } catch {
+        // ignore
+      }
+    }
     clearConvenienceRamSession();
     this.lock({ broadcast: false, reason: 'wiped', clearConvenience: true });
     await this.storage.wipeAll({ wipeSettings: false });

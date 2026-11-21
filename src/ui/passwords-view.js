@@ -831,23 +831,7 @@ function openBulkMoveSheet({ session, lang, selectedIds, sections, onStateChange
           type: 'button',
           class: `btn btn-block ${accentCls}`.trim(),
           onClick: async () => {
-            for (const id of selectedIds) {
-              const rec = await session.storage.getRecord(id);
-              if (rec) {
-                const decrypted = await session.decryptRecord(rec);
-                if (decrypted) {
-                  await session.saveRecord({
-                    id: decrypted.id,
-                    type: 'password',
-                    createdAt: decrypted.createdAt,
-                    data: {
-                      ...decrypted.data,
-                      sectionId: s.id,
-                    },
-                  });
-                }
-              }
-            }
+            await session.movePasswordsToSection(selectedIds, s.id);
             sheet.close();
             triggerHaptic();
             onStateChange({ selectedIds: new Set() });
@@ -1064,19 +1048,37 @@ function openManageSectionsSheet({ session, lang, sections, passwords, onRefresh
       const itemCount = passwords.filter((p) => p.data?.sectionId === sec.id).length;
 
       const renameIn = el('input', { type: 'text', class: 'input', value: d.name || '', 'aria-label': d.name || 'Section' });
+      const editEmojiSel = el(
+        'select',
+        { class: 'select', 'aria-label': 'Emoji' },
+        ...SECTION_EMOJIS.map((em) => el('option', { value: em, selected: (d.emoji || '📁') === em }, em))
+      );
+      const editColorSel = el(
+        'select',
+        { class: 'select', 'aria-label': 'Color' },
+        ...SECTION_COLOR_OPTIONS.map((c) =>
+          el('option', { value: c.hex, selected: String(d.color || '#38bdf8').toLowerCase() === c.hex }, lang === 'en' ? c.nameEn : c.nameAr)
+        )
+      );
       const saveBtn = el(
         'button',
         {
           type: 'button',
-          class: 'btn btn-sm',
+          class: 'btn btn-sm btn-primary',
           onClick: async () => {
             if (!renameIn.value.trim()) return;
             await session.saveRecord({
               id: sec.id,
               type: 'section',
               createdAt: sec.createdAt,
-              data: { ...d, name: renameIn.value.trim() },
+              data: {
+                ...d,
+                name: renameIn.value.trim(),
+                emoji: editEmojiSel.value,
+                color: editColorSel.value,
+              },
             });
+            sheet.close();
             showToast(t(lang, 'save'), 'success');
             await onRefresh();
           },
@@ -1120,7 +1122,8 @@ function openManageSectionsSheet({ session, lang, sections, passwords, onRefresh
         el(
           'div',
           { class: `glass-card glass-card-compact settings-group ${accentClassForHex(d.color)}` },
-          el('div', { class: 'input-row' }, el('span', null, d.emoji || '📁'), renameIn, saveBtn),
+          el('div', { class: 'input-row' }, renameIn, saveBtn),
+          el('div', { class: 'form-grid-2' }, editEmojiSel, editColorSel),
           el(
             'div',
             { class: 'toolbar-row' },
