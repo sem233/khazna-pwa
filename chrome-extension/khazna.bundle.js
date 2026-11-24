@@ -3230,6 +3230,16 @@
   }
 
   // src/auth/session.js
+  function getChromeSessionStorage(env = globalThis) {
+    try {
+      if (env.location?.protocol === "chrome-extension:" && env.chrome?.storage?.session && typeof env.chrome.storage.session.get === "function") {
+        return env.chrome.storage.session;
+      }
+    } catch {
+    }
+    return null;
+  }
+  var CHROME_SESSION_KEY = "khazna_ram_session_v1";
   function getNativeBiometricPlugin(env = globalThis) {
     try {
       if (env.Capacitor?.Plugins?.NativeBiometric) {
@@ -3408,8 +3418,68 @@
     get hasPasswordUnlock() {
       return this.unlockMethod === "password" || this._header?.wrappers?.alt?.method === "password";
     }
+    async _saveChromeRamSession(extractableDek) {
+      const sessStore = getChromeSessionStorage(this._env);
+      if (!sessStore || !extractableDek || !this._header?.vaultId) return;
+      try {
+        const rawBuf = await this._env.crypto.subtle.exportKey("raw", extractableDek);
+        const rawBytes = new Uint8Array(rawBuf);
+        const b64 = bytesToBase64(rawBytes);
+        zeroize(rawBytes);
+        const autoSec = Math.max(30, Math.min(900, this._settings?.autoLockSec ?? 120));
+        await sessStore.set({
+          [CHROME_SESSION_KEY]: {
+            vaultId: this._header.vaultId,
+            dekB64: b64,
+            expiresAt: this._now() + autoSec * 1e3
+          }
+        });
+      } catch {
+      }
+    }
+    async _clearChromeRamSession() {
+      const sessStore = getChromeSessionStorage(this._env);
+      if (!sessStore) return;
+      try {
+        await sessStore.remove(CHROME_SESSION_KEY);
+      } catch {
+      }
+    }
+    async _tryRestoreChromeRamSession() {
+      const sessStore = getChromeSessionStorage(this._env);
+      if (!sessStore || !this._header?.vaultId) return false;
+      try {
+        const data = await sessStore.get(CHROME_SESSION_KEY);
+        const entry = data?.[CHROME_SESSION_KEY];
+        if (!entry || entry.vaultId !== this._header.vaultId || !entry.dekB64) return false;
+        if (typeof entry.expiresAt !== "number" || this._now() >= entry.expiresAt) {
+          await this._clearChromeRamSession();
+          return false;
+        }
+        const rawBytes = base64ToBytes(entry.dekB64);
+        const dek = await this._env.crypto.subtle.importKey(
+          "raw",
+          rawBytes,
+          { name: "AES-GCM" },
+          false,
+          ["encrypt", "decrypt"]
+        );
+        zeroize(rawBytes);
+        this.#dek = dek;
+        this._unlockedAt = this._now();
+        this._lastActivityAt = this._now();
+        this._scheduleInactivityLock();
+        return true;
+      } catch {
+        await this._clearChromeRamSession();
+        return false;
+      }
+    }
     async init() {
       await this.refreshMeta();
+      if (this.hasVault) {
+        await this._tryRestoreChromeRamSession();
+      }
       return {
         hasVault: this.hasVault,
         settings: this._settings,
@@ -3549,6 +3619,16 @@
         await this.storage.putRecordsBatch(envelopes);
       }
       this._settings = await this.storage.saveSettings({ onboardingDone: true });
+      if (getChromeSessionStorage(this._env)) {
+        try {
+          const extRes = await unwrapDekWithPassword(header, masterPassword, {
+            extractable: true,
+            useWorker: this._useWorker
+          });
+          await this._saveChromeRamSession(extRes.dek);
+        } catch {
+        }
+      }
       this._scheduleInactivityLock();
       this._emit("unlocked", { method: "create", kdfEngine });
       return {
@@ -3605,12 +3685,18 @@
       this._assertNotLockedOut();
       try {
         const wantConvenienceArm = this._header?.wrappers?.webauthn?.mode === "convenience";
+        const wantChromeRam = Boolean(getChromeSessionStorage(this._env));
         const { dek, kdfEngine } = await unwrapDekWithPassword(this._header, masterPassword, {
-          extractable: wantConvenienceArm,
+          extractable: wantConvenienceArm || wantChromeRam,
           useWorker: this._useWorker
         });
         if (wantConvenienceArm) {
           await armConvenienceRamSession(this._header.vaultId, dek, this._now());
+        }
+        if (wantChromeRam) {
+          await this._saveChromeRamSession(dek);
+        }
+        if (wantConvenienceArm || wantChromeRam) {
           const strict = await unwrapDekWithPassword(this._header, masterPassword, {
             extractable: false,
             useWorker: this._useWorker
@@ -3750,6 +3836,7 @@
     lock({ broadcast = true, reason = "manual", clearConvenience = false } = {}) {
       this.#dek = null;
       this._clearTimers();
+      this._clearChromeRamSession();
       if (clearConvenience) {
         clearConvenienceRamSession();
       }
@@ -11318,7 +11405,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
               renderCreateCard();
             }
           },
-          t(lang, "patternTabLabel")
+          lang === "en" ? "Pattern" : "\u0627\u0644\u0646\u0645\u0637"
         );
         const tabPassword = el(
           "button",
@@ -11330,7 +11417,19 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
               renderCreateCard();
             }
           },
-          t(lang, "passwordTabLabel")
+          lang === "en" ? "Password" : "\u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631"
+        );
+        const tabTransfer = el(
+          "button",
+          {
+            type: "button",
+            class: `seg-btn ${createMode === "transfer" ? "is-active" : ""}`.trim(),
+            onClick: () => {
+              createMode = "transfer";
+              renderCreateCard();
+            }
+          },
+          lang === "en" ? "From Code" : "\u0646\u0642\u0644 \u0628\u0627\u0644\u0643\u0648\u062F"
         );
         card2.appendChild(topTools);
         card2.appendChild(
@@ -11342,9 +11441,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
             el("p", null, createMode === "transfer" ? t(lang, "transferFromOldSub") : t(lang, "createVaultSubtitle"))
           )
         );
-        if (createMode !== "transfer") {
-          card2.appendChild(el("div", { class: "segmented" }, tabPattern, tabPassword));
-        }
+        card2.appendChild(el("div", { class: "segmented" }, tabPattern, tabPassword, tabTransfer));
         card2.appendChild(errBox);
         if (createMode === "pattern") {
           let firstSecret = null;
@@ -11571,21 +11668,6 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
           card2.appendChild(el("div", { class: "segmented" }, segPat, segPwd));
           card2.appendChild(lockHost);
         }
-        card2.appendChild(
-          el(
-            "button",
-            {
-              type: "button",
-              class: "btn btn-ghost btn-block",
-              onClick: () => {
-                createMode = createMode === "transfer" ? "pattern" : "transfer";
-                renderCreateCard();
-              }
-            },
-            svgIcon(createMode === "transfer" ? "shield" : "link", 17),
-            createMode === "transfer" ? t(lang, "createVaultTitle") : t(lang, "transferFromOldBtn")
-          )
-        );
       };
       renderCreateCard();
       screen.appendChild(card2);
@@ -11859,7 +11941,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
   }
 
   // src/main.js
-  var APP_VERSION = "2.3.0";
+  var APP_VERSION = "2.3.1";
   function isCapacitorAndroid() {
     return typeof window !== "undefined" && typeof window.Capacitor !== "undefined" && window.Capacitor?.isNativePlatform?.() === true && window.Capacitor?.getPlatform?.() === "android";
   }
@@ -12582,6 +12664,9 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     captureIncomingSyncHash();
     await session.init();
     applyThemeAndDirection();
+    if (session.isUnlocked) {
+      await loadDecryptedVaultData();
+    }
     const params = new URLSearchParams(window.location.search);
     if (params.get("overlay") === "true" || window.location.hash.includes("overlay") || window.__pendingOverlayMode === true) {
       appState.isOverlayMode = true;

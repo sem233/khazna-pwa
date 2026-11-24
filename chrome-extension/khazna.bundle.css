@@ -1167,7 +1167,36 @@ html.chrome-popup-mode .entry-card {
 
 html.chrome-popup-mode .auth-screen {
   min-height: 520px;
-  padding: 12px 10px;
+  padding: 10px;
+  align-items: flex-start;
+}
+
+html.chrome-popup-mode .auth-card {
+  gap: 10px;
+  padding: 14px;
+}
+
+html.chrome-popup-mode .auth-hero {
+  gap: 4px;
+}
+
+html.chrome-popup-mode .auth-hero-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+}
+
+html.chrome-popup-mode .auth-hero h1 {
+  font-size: 1.15rem;
+}
+
+html.chrome-popup-mode .auth-hero p {
+  font-size: 0.8rem;
+}
+
+html.chrome-popup-mode .pattern-svg {
+  width: 204px;
+  height: 204px;
 }
 
 .entry-top {

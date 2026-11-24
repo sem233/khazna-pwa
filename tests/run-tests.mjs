@@ -415,6 +415,36 @@ await test('Pattern Lock + Optional Password + Transfer from Old Device with Sam
   newSession.lock();
   await newSession.unlockWithPassword(pat);
   assert.equal(newSession.isUnlocked, true);
+
+  // Chrome Extension RAM session restore across popup close/reopen
+  const ramMap = new Map();
+  const extEnv = {
+    crypto: globalThis.crypto,
+    location: { protocol: 'chrome-extension:' },
+    chrome: {
+      storage: {
+        session: {
+          get: async (k) => ({ [k]: ramMap.get(k) }),
+          set: async (obj) => { for (const [k, v] of Object.entries(obj)) ramMap.set(k, v); },
+          remove: async (k) => { ramMap.delete(k); },
+        },
+      },
+    },
+  };
+  const extStorage = new VaultStorage({ backend: createMemoryBackend() });
+  const extPopup1 = new VaultSession({ storage: extStorage, env: extEnv, useWorker: false });
+  await extPopup1.init();
+  await extPopup1.createVault({ masterPassword: pat, kdfSpec: FAST_KDF, enforceMinimums: false });
+  assert.equal(ramMap.size, 1);
+
+  // Reopen popup (fresh VaultSession instance sharing same storage & chrome.storage.session)
+  const extPopup2 = new VaultSession({ storage: extStorage, env: extEnv, useWorker: false });
+  await extPopup2.init();
+  assert.equal(extPopup2.isUnlocked, true, 'Chrome Extension popup should stay unlocked in RAM across close/reopen');
+
+  // Manual lock wipes RAM session immediately
+  extPopup2.lock();
+  assert.equal(ramMap.size, 0);
 });
 
 await test('Security Static Audit: Zero innerHTML/eval/inline style= & zero external URLs', () => {

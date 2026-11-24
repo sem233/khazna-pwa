@@ -17,7 +17,7 @@ import { renderStatsView } from './ui/stats-view.js';
 import { openSyncSheet } from './ui/sync-sheet.js';
 import { renderUnlockView } from './ui/unlock-view.js';
 
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.3.1';
 
 /**
  * Returns true when running inside a real Capacitor Android app.
@@ -836,6 +836,9 @@ async function bootstrap() {
   captureIncomingSyncHash();
   await session.init();
   applyThemeAndDirection();
+  if (session.isUnlocked) {
+    await loadDecryptedVaultData();
+  }
 
   // Check optional PWA share_target query parameter (?shared_text=...) or overlay mode (?overlay=true)
   const params = new URLSearchParams(window.location.search);

@@ -179,7 +179,7 @@ export function renderUnlockView({
             renderCreateCard();
           },
         },
-        t(lang, 'patternTabLabel')
+        lang === 'en' ? 'Pattern' : 'النمط'
       );
       const tabPassword = el(
         'button',
@@ -191,7 +191,19 @@ export function renderUnlockView({
             renderCreateCard();
           },
         },
-        t(lang, 'passwordTabLabel')
+        lang === 'en' ? 'Password' : 'كلمة مرور'
+      );
+      const tabTransfer = el(
+        'button',
+        {
+          type: 'button',
+          class: `seg-btn ${createMode === 'transfer' ? 'is-active' : ''}`.trim(),
+          onClick: () => {
+            createMode = 'transfer';
+            renderCreateCard();
+          },
+        },
+        lang === 'en' ? 'From Code' : 'نقل بالكود'
       );
 
       card.appendChild(topTools);
@@ -205,9 +217,7 @@ export function renderUnlockView({
         )
       );
 
-      if (createMode !== 'transfer') {
-        card.appendChild(el('div', { class: 'segmented' }, tabPattern, tabPassword));
-      }
+      card.appendChild(el('div', { class: 'segmented' }, tabPattern, tabPassword, tabTransfer));
       card.appendChild(errBox);
 
       if (createMode === 'pattern') {
@@ -444,23 +454,6 @@ export function renderUnlockView({
         card.appendChild(el('div', { class: 'segmented' }, segPat, segPwd));
         card.appendChild(lockHost);
       }
-
-      // Toggle button between Create New & Transfer from Old Device
-      card.appendChild(
-        el(
-          'button',
-          {
-            type: 'button',
-            class: 'btn btn-ghost btn-block',
-            onClick: () => {
-              createMode = createMode === 'transfer' ? 'pattern' : 'transfer';
-              renderCreateCard();
-            },
-          },
-          svgIcon(createMode === 'transfer' ? 'shield' : 'link', 17),
-          createMode === 'transfer' ? t(lang, 'createVaultTitle') : t(lang, 'transferFromOldBtn')
-        )
-      );
     };
 
     renderCreateCard();
