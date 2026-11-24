@@ -8,6 +8,7 @@
  */
 
 import { formatError, t } from '../i18n/strings.js';
+import { createPatternPad } from './pattern-pad.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -461,16 +462,9 @@ export function requestReauth({ session, lang }) {
       resolve(ok);
     };
 
+    let activeMethod = session.hasPatternUnlock ? 'pattern' : 'password';
+    const host = el('div', { class: 'settings-group' });
     const errBox = el('div', { class: 'banner banner-danger hidden', role: 'alert' });
-    const pwdInput = el('input', {
-      type: 'password',
-      class: 'input ltr-value',
-      autocomplete: 'off',
-      spellcheck: 'false',
-      placeholder: t(lang, 'masterPasswordLabel'),
-    });
-
-    const submitBtn = el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, t(lang, 'confirmBtn'));
     const bioState = session.getBiometricState();
 
     const bioBtn = bioState.enabled
@@ -495,34 +489,106 @@ export function requestReauth({ session, lang }) {
         )
       : null;
 
-    const form = el(
-      'form',
-      {
-        onSubmit: async (e) => {
-          e.preventDefault();
-          errBox.classList.add('hidden');
-          submitBtn.disabled = true;
-          try {
-            await session.verifyReauth({ masterPassword: pwdInput.value });
-            pwdInput.value = '';
-            finish(true);
-          } catch (err) {
-            errBox.textContent = formatError(err, lang);
-            errBox.classList.remove('hidden');
-          } finally {
-            submitBtn.disabled = false;
-          }
-        },
-      },
-      el('p', { class: 'settings-row-desc' }, t(lang, 'reauthSubtitle')),
-      errBox,
-      el('div', { class: 'field' }, pwdInput),
-      el('div', { class: 'settings-group' }, submitBtn, bioBtn)
-    );
+    const renderContent = () => {
+      clearNode(host);
+      host.appendChild(el('p', { class: 'settings-row-desc' }, t(lang, 'reauthSubtitle')));
+      host.appendChild(errBox);
+
+      if (activeMethod === 'pattern') {
+        const pad = createPatternPad({
+          lang,
+          hint: t(lang, 'patternDrawUnlock'),
+          onComplete: async (secret) => {
+            errBox.classList.add('hidden');
+            pad.setDisabled(true);
+            try {
+              await session.verifyReauth({ masterPassword: secret });
+              pad.setSuccess();
+              finish(true);
+            } catch (err) {
+              pad.setDisabled(false);
+              pad.setError(formatError(err, lang));
+              errBox.textContent = formatError(err, lang);
+              errBox.classList.remove('hidden');
+            }
+          },
+        });
+        host.appendChild(pad.wrap);
+        if (session.hasPasswordUnlock) {
+          host.appendChild(
+            el(
+              'button',
+              {
+                type: 'button',
+                class: 'btn btn-ghost btn-sm btn-block',
+                onClick: () => {
+                  activeMethod = 'password';
+                  renderContent();
+                },
+              },
+              t(lang, 'usePasswordUnlock')
+            )
+          );
+        }
+      } else {
+        const pwdInput = el('input', {
+          type: 'password',
+          class: 'input ltr-value',
+          autocomplete: 'off',
+          spellcheck: 'false',
+          placeholder: t(lang, 'masterPasswordLabel'),
+        });
+        const submitBtn = el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, t(lang, 'confirmBtn'));
+        const form = el(
+          'form',
+          {
+            onSubmit: async (e) => {
+              e.preventDefault();
+              errBox.classList.add('hidden');
+              submitBtn.disabled = true;
+              try {
+                await session.verifyReauth({ masterPassword: pwdInput.value });
+                pwdInput.value = '';
+                finish(true);
+              } catch (err) {
+                errBox.textContent = formatError(err, lang);
+                errBox.classList.remove('hidden');
+              } finally {
+                submitBtn.disabled = false;
+              }
+            },
+          },
+          el('div', { class: 'field' }, pwdInput),
+          submitBtn
+        );
+        host.appendChild(form);
+        if (session.hasPatternUnlock) {
+          host.appendChild(
+            el(
+              'button',
+              {
+                type: 'button',
+                class: 'btn btn-ghost btn-sm btn-block',
+                onClick: () => {
+                  activeMethod = 'pattern';
+                  renderContent();
+                },
+              },
+              t(lang, 'usePatternUnlock')
+            )
+          );
+        }
+        setTimeout(() => pwdInput.focus(), 60);
+      }
+
+      if (bioBtn) host.appendChild(bioBtn);
+    };
+
+    renderContent();
 
     const sheet = openBottomSheet({
       title: t(lang, 'reauthTitle'),
-      content: form,
+      content: host,
       onClose: () => {
         if (!settled) {
           settled = true;
@@ -530,7 +596,6 @@ export function requestReauth({ session, lang }) {
         }
       },
     });
-    setTimeout(() => pwdInput.focus(), 60);
   });
 }
 

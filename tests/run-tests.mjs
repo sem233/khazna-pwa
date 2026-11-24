@@ -28,10 +28,12 @@ import { argon2idPure } from '../src/crypto/argon2id-pure.js';
 import {
   createVaultCrypto,
   decryptRecord,
+  encodePatternSecret,
   encryptRecord,
   evaluatePasswordStrength,
   generatePassphrase,
   generatePassword,
+  isPatternSecret,
 } from '../src/crypto/vault-crypto.js';
 import { createMemoryBackend, VaultStorage } from '../src/storage/idb.js';
 import { ClipboardGuard, VaultSession } from '../src/auth/session.js';
@@ -338,6 +340,81 @@ await test('Import/Export & Sync: .vault, Bitwarden JSON, Chrome CSV, and encryp
   const mergedPw = await targetSession.listRecords('password');
   assert.equal(mergedPw.length, 1);
   assert.equal(mergedPw[0].data.title, 'Mail');
+});
+
+await test('Pattern Lock + Optional Password + Transfer from Old Device with Same Lock + Browser Screenshot Safe', async () => {
+  const pat = encodePatternSecret([0, 1, 2, 5, 8]);
+  assert.equal(isPatternSecret(pat), true);
+  assert.throws(() => encodePatternSecret([0, 1, 2]));
+
+  // Device 1 (Old Device): created with 3x3 Pattern
+  const oldStorage = new VaultStorage({ backend: createMemoryBackend() });
+  const oldSession = new VaultSession({ storage: oldStorage, useWorker: false });
+  await oldSession.init();
+  await oldSession.createVault({
+    masterPassword: pat,
+    kdfSpec: FAST_KDF,
+    enforceMinimums: false,
+  });
+  assert.equal(oldSession.unlockMethod, 'pattern');
+  assert.equal(oldSession.hasPatternUnlock, true);
+  assert.equal(oldSession.hasPasswordUnlock, false);
+
+  // Browser screenshot safe: privacyBlurOnBlur defaults to false
+  assert.equal(oldSession.settings.privacyBlurOnBlur, false);
+  oldSession.handleVisibilityChange(true);
+  assert.equal(oldSession.isBlurred, false);
+
+  // Optional secondary password can be added alongside Pattern
+  await oldSession.setSecondaryUnlock({ currentSecret: pat, altSecret: 'OptionalBackupPwd!2026' });
+  assert.equal(oldSession.hasPatternUnlock, true);
+  assert.equal(oldSession.hasPasswordUnlock, true);
+
+  // Both Pattern AND Optional Password unlock the vault!
+  oldSession.lock();
+  await oldSession.unlockWithPassword('OptionalBackupPwd!2026');
+  assert.equal(oldSession.isUnlocked, true);
+  oldSession.lock();
+  await oldSession.unlockWithPassword(pat);
+  assert.equal(oldSession.isUnlocked, true);
+
+  // Add a password on Old Device & generate Transfer Code with the SAME Pattern
+  const oldSections = await oldSession.listRecords('section');
+  await oldSession.saveRecord({
+    type: 'password',
+    data: { title: 'Instagram', username: 'osama_ig', password: 'IGSecret#99', sectionId: oldSections[0].id },
+  });
+  const payload = selectSyncRecords({
+    sections: oldSections,
+    passwords: await oldSession.listRecords('password'),
+    cards: [],
+    notes: [],
+    mode: 'full',
+  });
+  const encTransfer = await encodeSyncPackage({ payload, passphrase: pat });
+
+  // Device 2 (Brand-New Device): createVaultFromSyncCode using exact SAME Pattern
+  const newStorage = new VaultStorage({ backend: createMemoryBackend() });
+  const newSession = new VaultSession({ storage: newStorage, useWorker: false });
+  await newSession.init();
+  const transferRes = await newSession.createVaultFromSyncCode({
+    syncInput: encTransfer.code,
+    secret: pat,
+    kdfSpec: FAST_KDF,
+    enforceMinimums: false,
+  });
+  assert.equal(newSession.isUnlocked, true);
+  assert.equal(newSession.unlockMethod, 'pattern');
+  assert.equal(transferRes.counts.passwords, 1);
+
+  const transferredPws = await newSession.listRecords('password');
+  assert.equal(transferredPws.length, 1);
+  assert.equal(transferredPws[0].data.title, 'Instagram');
+
+  // Lock & unlock New Device with the exact SAME Pattern
+  newSession.lock();
+  await newSession.unlockWithPassword(pat);
+  assert.equal(newSession.isUnlocked, true);
 });
 
 await test('Security Static Audit: Zero innerHTML/eval/inline style= & zero external URLs', () => {

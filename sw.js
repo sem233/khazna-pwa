@@ -8,7 +8,7 @@
  * 3. Full offline usability after first load (cache-first for app shell).
  */
 
-const CACHE_NAME = 'khazna-shell-v2.2.0';
+const CACHE_NAME = 'khazna-shell-v2.3.0';
 
 const APP_SHELL_ASSETS = [
   './',
@@ -44,6 +44,7 @@ const APP_SHELL_ASSETS = [
   './src/import-export/manager.js',
   './src/import-export/sync.js',
   './src/ui/dom.js',
+  './src/ui/pattern-pad.js',
   './src/ui/unlock-view.js',
   './src/ui/generator-sheet.js',
   './src/ui/passwords-view.js',

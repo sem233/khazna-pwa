@@ -1887,6 +1887,192 @@ html.chrome-popup-mode .auth-screen {
   }
 }
 
+/* --- Ultra-Simple Chic Password & Bank Cards --- */
+.btn-icon-sm {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.btn-icon-sm:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-glass-hover);
+}
+
+.btn-icon-sm.is-fav {
+  color: #fbbf24;
+}
+
+.entry-card-simple {
+  padding: 13px 15px;
+  gap: 10px;
+}
+
+.entry-top-simple {
+  align-items: center;
+}
+
+.entry-mini-icons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.entry-copy-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.entry-copy-btn {
+  width: 100%;
+  min-height: 38px;
+  font-size: 0.84rem;
+  border-radius: 11px;
+}
+
+.bank-card-scene.is-clickable {
+  cursor: pointer;
+}
+
+.bank-card-simple {
+  padding: 12px;
+  gap: 10px;
+}
+
+.card-simple-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-simple-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.card-simple-copy {
+  flex: 1;
+}
+
+.card-simple-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* --- Interactive 3x3 Pattern Lock Pad (Mouse & Touch, Zero Inline Styles) --- */
+.pattern-pad-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-block: 4px;
+}
+
+.pattern-status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+  min-height: 1.4em;
+}
+
+.pattern-svg {
+  width: 248px;
+  height: 248px;
+  max-width: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: crosshair;
+  border-radius: 22px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-hairline);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pattern-svg.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.pattern-dot-ring {
+  fill: rgba(148, 163, 184, 0.08);
+  stroke: var(--border-strong);
+  stroke-width: 2;
+  transition: fill 0.14s ease, stroke 0.14s ease, transform 0.14s ease;
+}
+
+.pattern-dot-core {
+  fill: var(--text-muted);
+  transition: fill 0.14s ease;
+}
+
+.pattern-dot.is-active .pattern-dot-ring {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.pattern-dot.is-active .pattern-dot-core {
+  fill: var(--accent);
+}
+
+.pattern-line {
+  stroke: var(--accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+
+.pattern-live-line {
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 6 6;
+  opacity: 0.65;
+}
+
+.pattern-svg.is-error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.pattern-svg.is-error .pattern-line,
+.pattern-svg.is-error .pattern-dot.is-active .pattern-dot-ring {
+  stroke: var(--danger);
+}
+
+.pattern-svg.is-error .pattern-dot.is-active .pattern-dot-core {
+  fill: var(--danger);
+}
+
+.pattern-svg.is-success {
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px var(--success-soft);
+}
+
+.pattern-svg.is-success .pattern-line,
+.pattern-svg.is-success .pattern-dot.is-active .pattern-dot-ring {
+  stroke: var(--success);
+}
+
+.pattern-svg.is-success .pattern-dot.is-active .pattern-dot-core {
+  fill: var(--success);
+}
+
 
 /* Khazna (خزنة) — 60fps Transform & Opacity Animations + Prefers-Reduced-Motion */
 

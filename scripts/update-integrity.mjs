@@ -41,6 +41,7 @@ const FILES = [
   'src/import-export/manager.js',
   'src/import-export/sync.js',
   'src/ui/dom.js',
+  'src/ui/pattern-pad.js',
   'src/ui/unlock-view.js',
   'src/ui/generator-sheet.js',
   'src/ui/passwords-view.js',

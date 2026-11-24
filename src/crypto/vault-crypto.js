@@ -29,6 +29,45 @@ export const RECORD_SCHEMA_VERSION = 1;
 export const BACKUP_FORMAT_ID = 'khazna-vault-backup';
 export const BACKUP_FORMAT_VERSION = 1;
 export const MIN_MASTER_PASSWORD_LEN = 12;
+export const PATTERN_PREFIX = 'KHAZNA-PATTERN-V1:';
+export const MIN_PATTERN_DOTS = 4;
+
+export function encodePatternSecret(dots) {
+  if (!Array.isArray(dots) || dots.length < MIN_PATTERN_DOTS || dots.length > 9) {
+    throw new KhaznaError(
+      'PATTERN_TOO_SHORT',
+      `يجب توصيل ${MIN_PATTERN_DOTS} نقاط على الأقل لرسم النمط.`,
+      `Pattern must connect at least ${MIN_PATTERN_DOTS} dots.`
+    );
+  }
+  const seen = new Set();
+  const clean = [];
+  for (const d of dots) {
+    const n = Number(d);
+    if (!Number.isInteger(n) || n < 0 || n > 8 || seen.has(n)) {
+      throw new KhaznaError(
+        'INVALID_PATTERN',
+        'النمط غير صالح.',
+        'Invalid pattern sequence.'
+      );
+    }
+    seen.add(n);
+    clean.push(n);
+  }
+  return `${PATTERN_PREFIX}${clean.join('-')}`;
+}
+
+export function isPatternSecret(secret) {
+  if (typeof secret !== 'string' || !secret.startsWith(PATTERN_PREFIX)) return false;
+  const parts = secret.slice(PATTERN_PREFIX.length).split('-').map((x) => Number(x));
+  if (parts.length < MIN_PATTERN_DOTS || parts.length > 9) return false;
+  const seen = new Set();
+  for (const n of parts) {
+    if (!Number.isInteger(n) || n < 0 || n > 8 || seen.has(n)) return false;
+    seen.add(n);
+  }
+  return true;
+}
 
 const HKDF_INFO_RECOVERY = utf8Encode('khazna-v1-recovery-dek-wrap');
 const HKDF_INFO_WEBAUTHN = utf8Encode('khazna-v1-webauthn-prf-dek-wrap');
@@ -80,9 +119,19 @@ export function validateMasterPasswordPolicy(password) {
   if (typeof password !== 'string') {
     throw new KhaznaError(
       'WEAK_MASTER_PASSWORD',
-      'يجب إدخال كلمة مرور رئيسية صالحة.',
-      'Master password must be a string.'
+      'يجب إدخال كلمة مرور أو نمط صالح.',
+      'Master password or pattern must be a string.'
     );
+  }
+  if (password.startsWith(PATTERN_PREFIX)) {
+    if (!isPatternSecret(password)) {
+      throw new KhaznaError(
+        'PATTERN_TOO_SHORT',
+        `يجب توصيل ${MIN_PATTERN_DOTS} نقاط على الأقل لرسم النمط.`,
+        `Pattern must connect at least ${MIN_PATTERN_DOTS} dots.`
+      );
+    }
+    return;
   }
   const codePoints = Array.from(password).length;
   if (codePoints < MIN_MASTER_PASSWORD_LEN) {
@@ -195,6 +244,7 @@ export async function createVaultCrypto({
       version: VAULT_HEADER_VERSION,
       vaultId,
       schemaVersion: RECORD_SCHEMA_VERSION,
+      unlockMethod: isPatternSecret(masterPassword) ? 'pattern' : 'password',
       kdf: kdfSpec.kdf,
       kdfParams: { ...kdfSpec.params },
       wrappers: {
@@ -204,6 +254,7 @@ export async function createVaultCrypto({
           wrappedDek: passwordWrapped.wrappedDek,
           updatedAt: now,
         },
+        alt: null,
         recovery: {
           salt: bytesToBase64(recoverySalt),
           iv: recoveryWrapped.iv,
@@ -235,6 +286,7 @@ export async function createVaultCrypto({
 
 export async function unwrapDekWithPassword(header, masterPassword, opts = {}) {
   const pwWrapper = header?.wrappers?.password;
+  const altWrapper = header?.wrappers?.alt;
   if (!pwWrapper?.salt || !pwWrapper?.iv || !pwWrapper?.wrappedDek) {
     throw new KhaznaError(
       'CORRUPT_HEADER',
@@ -243,36 +295,59 @@ export async function unwrapDekWithPassword(header, masterPassword, opts = {}) {
     );
   }
 
-  const salt = base64ToBytes(pwWrapper.salt);
-  let kekBytes = null;
-  try {
-    const derived = await deriveKeyBytes(
-      masterPassword,
-      salt,
-      { kdf: header.kdf, params: header.kdfParams },
-      { useWorker: opts.useWorker }
-    );
-    kekBytes = derived.keyBytes;
-    const kek = await importAesWrapKey(kekBytes);
-    const dek = await unwrapDek(
-      pwWrapper,
-      kek,
-      header.vaultId,
-      'password',
-      Boolean(opts.extractable)
-    );
-    return { dek, kdfEngine: derived.engine };
-  } catch (err) {
-    if (err instanceof KhaznaError) throw err;
-    throw new KhaznaError(
-      'WRONG_PASSWORD',
-      'كلمة المرور الرئيسية غير صحيحة.',
-      'Incorrect master password.',
-      err
-    );
-  } finally {
-    zeroize(kekBytes);
+  const candidates = [{ wrapper: pwWrapper, wrapperId: 'password' }];
+  if (altWrapper?.salt && altWrapper?.iv && altWrapper?.wrappedDek) {
+    // Prefer matching wrapper first to avoid double KDF derivation
+    const isPat = isPatternSecret(masterPassword);
+    const altMatches =
+      (altWrapper.method === 'pattern' && isPat) ||
+      (altWrapper.method === 'password' && !isPat);
+    if (altMatches) {
+      candidates.unshift({ wrapper: altWrapper, wrapperId: 'alt' });
+    } else {
+      candidates.push({ wrapper: altWrapper, wrapperId: 'alt' });
+    }
   }
+
+  let lastErr = null;
+  for (const { wrapper, wrapperId } of candidates) {
+    const salt = base64ToBytes(wrapper.salt);
+    let kekBytes = null;
+    try {
+      const derived = await deriveKeyBytes(
+        masterPassword,
+        salt,
+        { kdf: header.kdf, params: header.kdfParams },
+        { useWorker: opts.useWorker }
+      );
+      kekBytes = derived.keyBytes;
+      const kek = await importAesWrapKey(kekBytes);
+      const dek = await unwrapDek(
+        wrapper,
+        kek,
+        header.vaultId,
+        wrapperId,
+        Boolean(opts.extractable)
+      );
+      return { dek, kdfEngine: derived.engine };
+    } catch (err) {
+      lastErr = err;
+    } finally {
+      zeroize(kekBytes);
+    }
+  }
+
+  if (lastErr instanceof KhaznaError) throw lastErr;
+  throw new KhaznaError(
+    'WRONG_PASSWORD',
+    isPatternSecret(masterPassword)
+      ? 'النمط غير صحيح. حاول مجدداً.'
+      : 'كلمة المرور الرئيسية غير صحيحة.',
+    isPatternSecret(masterPassword)
+      ? 'Incorrect unlock pattern.'
+      : 'Incorrect master password.',
+    lastErr
+  );
 }
 
 export async function unwrapDekWithRecoveryKey(header, formattedRecoveryKey, opts = {}) {
@@ -395,6 +470,7 @@ export async function rewrapMasterPassword({
 
     const updatedHeader = {
       ...header,
+      unlockMethod: isPatternSecret(newMasterPassword) ? 'pattern' : 'password',
       kdf: targetKdf.kdf,
       kdfParams: { ...targetKdf.params },
       wrappers: {
@@ -418,6 +494,49 @@ export async function rewrapMasterPassword({
     return { updatedHeader, dek: activeDek, kdfEngine: derived.engine };
   } finally {
     tempDek = null;
+    zeroize(newKekBytes);
+  }
+}
+
+export async function setAltUnlockWrapper({
+  header,
+  currentSecret,
+  altSecret,
+  useWorker = true,
+}) {
+  validateMasterPasswordPolicy(altSecret);
+  const { dek: tempDek } = await unwrapDekWithPassword(header, currentSecret, {
+    extractable: true,
+    useWorker,
+  });
+
+  const targetKdf = { kdf: header.kdf, params: header.kdfParams };
+  const newSalt = randomBytes(16);
+  let newKekBytes = null;
+  try {
+    const derived = await deriveKeyBytes(altSecret, newSalt, targetKdf, { useWorker });
+    newKekBytes = derived.keyBytes;
+    const newKek = await importAesWrapKey(newKekBytes);
+    const wrapped = await wrapDek(tempDek, newKek, header.vaultId, 'alt');
+    const now = new Date().toISOString();
+
+    const updatedHeader = {
+      ...header,
+      wrappers: {
+        ...header.wrappers,
+        alt: {
+          method: isPatternSecret(altSecret) ? 'pattern' : 'password',
+          salt: bytesToBase64(newSalt),
+          iv: wrapped.iv,
+          wrappedDek: wrapped.wrappedDek,
+          updatedAt: now,
+        },
+      },
+      updatedAt: now,
+    };
+
+    return { updatedHeader };
+  } finally {
     zeroize(newKekBytes);
   }
 }

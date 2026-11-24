@@ -1297,6 +1297,43 @@
   var BACKUP_FORMAT_ID = "khazna-vault-backup";
   var BACKUP_FORMAT_VERSION = 1;
   var MIN_MASTER_PASSWORD_LEN = 12;
+  var PATTERN_PREFIX = "KHAZNA-PATTERN-V1:";
+  var MIN_PATTERN_DOTS = 4;
+  function encodePatternSecret(dots) {
+    if (!Array.isArray(dots) || dots.length < MIN_PATTERN_DOTS || dots.length > 9) {
+      throw new KhaznaError(
+        "PATTERN_TOO_SHORT",
+        `\u064A\u062C\u0628 \u062A\u0648\u0635\u064A\u0644 ${MIN_PATTERN_DOTS} \u0646\u0642\u0627\u0637 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u0644\u0631\u0633\u0645 \u0627\u0644\u0646\u0645\u0637.`,
+        `Pattern must connect at least ${MIN_PATTERN_DOTS} dots.`
+      );
+    }
+    const seen = /* @__PURE__ */ new Set();
+    const clean = [];
+    for (const d of dots) {
+      const n = Number(d);
+      if (!Number.isInteger(n) || n < 0 || n > 8 || seen.has(n)) {
+        throw new KhaznaError(
+          "INVALID_PATTERN",
+          "\u0627\u0644\u0646\u0645\u0637 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D.",
+          "Invalid pattern sequence."
+        );
+      }
+      seen.add(n);
+      clean.push(n);
+    }
+    return `${PATTERN_PREFIX}${clean.join("-")}`;
+  }
+  function isPatternSecret(secret) {
+    if (typeof secret !== "string" || !secret.startsWith(PATTERN_PREFIX)) return false;
+    const parts = secret.slice(PATTERN_PREFIX.length).split("-").map((x) => Number(x));
+    if (parts.length < MIN_PATTERN_DOTS || parts.length > 9) return false;
+    const seen = /* @__PURE__ */ new Set();
+    for (const n of parts) {
+      if (!Number.isInteger(n) || n < 0 || n > 8 || seen.has(n)) return false;
+      seen.add(n);
+    }
+    return true;
+  }
   var HKDF_INFO_RECOVERY = utf8Encode("khazna-v1-recovery-dek-wrap");
   var HKDF_INFO_WEBAUTHN = utf8Encode("khazna-v1-webauthn-prf-dek-wrap");
   var CHARSETS = Object.freeze({
@@ -1568,9 +1605,19 @@
     if (typeof password !== "string") {
       throw new KhaznaError(
         "WEAK_MASTER_PASSWORD",
-        "\u064A\u062C\u0628 \u0625\u062F\u062E\u0627\u0644 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0631\u0626\u064A\u0633\u064A\u0629 \u0635\u0627\u0644\u062D\u0629.",
-        "Master password must be a string."
+        "\u064A\u062C\u0628 \u0625\u062F\u062E\u0627\u0644 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0623\u0648 \u0646\u0645\u0637 \u0635\u0627\u0644\u062D.",
+        "Master password or pattern must be a string."
       );
+    }
+    if (password.startsWith(PATTERN_PREFIX)) {
+      if (!isPatternSecret(password)) {
+        throw new KhaznaError(
+          "PATTERN_TOO_SHORT",
+          `\u064A\u062C\u0628 \u062A\u0648\u0635\u064A\u0644 ${MIN_PATTERN_DOTS} \u0646\u0642\u0627\u0637 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u0644\u0631\u0633\u0645 \u0627\u0644\u0646\u0645\u0637.`,
+          `Pattern must connect at least ${MIN_PATTERN_DOTS} dots.`
+        );
+      }
+      return;
     }
     const codePoints = Array.from(password).length;
     if (codePoints < MIN_MASTER_PASSWORD_LEN) {
@@ -1670,6 +1717,7 @@
         version: VAULT_HEADER_VERSION,
         vaultId,
         schemaVersion: RECORD_SCHEMA_VERSION,
+        unlockMethod: isPatternSecret(masterPassword) ? "pattern" : "password",
         kdf: kdfSpec.kdf,
         kdfParams: { ...kdfSpec.params },
         wrappers: {
@@ -1679,6 +1727,7 @@
             wrappedDek: passwordWrapped.wrappedDek,
             updatedAt: now
           },
+          alt: null,
           recovery: {
             salt: bytesToBase64(recoverySalt),
             iv: recoveryWrapped.iv,
@@ -1708,6 +1757,7 @@
   }
   async function unwrapDekWithPassword(header, masterPassword, opts = {}) {
     const pwWrapper = header?.wrappers?.password;
+    const altWrapper = header?.wrappers?.alt;
     if (!pwWrapper?.salt || !pwWrapper?.iv || !pwWrapper?.wrappedDek) {
       throw new KhaznaError(
         "CORRUPT_HEADER",
@@ -1715,36 +1765,50 @@
         "Vault header is missing password wrapper."
       );
     }
-    const salt = base64ToBytes(pwWrapper.salt);
-    let kekBytes = null;
-    try {
-      const derived = await deriveKeyBytes(
-        masterPassword,
-        salt,
-        { kdf: header.kdf, params: header.kdfParams },
-        { useWorker: opts.useWorker }
-      );
-      kekBytes = derived.keyBytes;
-      const kek = await importAesWrapKey(kekBytes);
-      const dek = await unwrapDek(
-        pwWrapper,
-        kek,
-        header.vaultId,
-        "password",
-        Boolean(opts.extractable)
-      );
-      return { dek, kdfEngine: derived.engine };
-    } catch (err) {
-      if (err instanceof KhaznaError) throw err;
-      throw new KhaznaError(
-        "WRONG_PASSWORD",
-        "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629.",
-        "Incorrect master password.",
-        err
-      );
-    } finally {
-      zeroize(kekBytes);
+    const candidates = [{ wrapper: pwWrapper, wrapperId: "password" }];
+    if (altWrapper?.salt && altWrapper?.iv && altWrapper?.wrappedDek) {
+      const isPat = isPatternSecret(masterPassword);
+      const altMatches = altWrapper.method === "pattern" && isPat || altWrapper.method === "password" && !isPat;
+      if (altMatches) {
+        candidates.unshift({ wrapper: altWrapper, wrapperId: "alt" });
+      } else {
+        candidates.push({ wrapper: altWrapper, wrapperId: "alt" });
+      }
     }
+    let lastErr = null;
+    for (const { wrapper, wrapperId } of candidates) {
+      const salt = base64ToBytes(wrapper.salt);
+      let kekBytes = null;
+      try {
+        const derived = await deriveKeyBytes(
+          masterPassword,
+          salt,
+          { kdf: header.kdf, params: header.kdfParams },
+          { useWorker: opts.useWorker }
+        );
+        kekBytes = derived.keyBytes;
+        const kek = await importAesWrapKey(kekBytes);
+        const dek = await unwrapDek(
+          wrapper,
+          kek,
+          header.vaultId,
+          wrapperId,
+          Boolean(opts.extractable)
+        );
+        return { dek, kdfEngine: derived.engine };
+      } catch (err) {
+        lastErr = err;
+      } finally {
+        zeroize(kekBytes);
+      }
+    }
+    if (lastErr instanceof KhaznaError) throw lastErr;
+    throw new KhaznaError(
+      "WRONG_PASSWORD",
+      isPatternSecret(masterPassword) ? "\u0627\u0644\u0646\u0645\u0637 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D. \u062D\u0627\u0648\u0644 \u0645\u062C\u062F\u062F\u0627\u064B." : "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629.",
+      isPatternSecret(masterPassword) ? "Incorrect unlock pattern." : "Incorrect master password.",
+      lastErr
+    );
   }
   async function unwrapDekWithRecoveryKey(header, formattedRecoveryKey, opts = {}) {
     const recWrapper = header?.wrappers?.recovery;
@@ -1858,6 +1922,7 @@
       const now = (/* @__PURE__ */ new Date()).toISOString();
       const updatedHeader = {
         ...header,
+        unlockMethod: isPatternSecret(newMasterPassword) ? "pattern" : "password",
         kdf: targetKdf.kdf,
         kdfParams: { ...targetKdf.params },
         wrappers: {
@@ -1880,6 +1945,45 @@
       return { updatedHeader, dek: activeDek, kdfEngine: derived.engine };
     } finally {
       tempDek = null;
+      zeroize(newKekBytes);
+    }
+  }
+  async function setAltUnlockWrapper({
+    header,
+    currentSecret,
+    altSecret,
+    useWorker = true
+  }) {
+    validateMasterPasswordPolicy(altSecret);
+    const { dek: tempDek } = await unwrapDekWithPassword(header, currentSecret, {
+      extractable: true,
+      useWorker
+    });
+    const targetKdf = { kdf: header.kdf, params: header.kdfParams };
+    const newSalt = randomBytes(16);
+    let newKekBytes = null;
+    try {
+      const derived = await deriveKeyBytes(altSecret, newSalt, targetKdf, { useWorker });
+      newKekBytes = derived.keyBytes;
+      const newKek = await importAesWrapKey(newKekBytes);
+      const wrapped = await wrapDek(tempDek, newKek, header.vaultId, "alt");
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const updatedHeader = {
+        ...header,
+        wrappers: {
+          ...header.wrappers,
+          alt: {
+            method: isPatternSecret(altSecret) ? "pattern" : "password",
+            salt: bytesToBase64(newSalt),
+            iv: wrapped.iv,
+            wrappedDek: wrapped.wrappedDek,
+            updatedAt: now
+          }
+        },
+        updatedAt: now
+      };
+      return { updatedHeader };
+    } finally {
       zeroize(newKekBytes);
     }
   }
@@ -2249,6 +2353,408 @@
     kdf: KDF_ALGO.PBKDF2_SHA256,
     params: { iterations: 6e5 }
   });
+
+  // src/import-export/sync.js
+  var SYNC_PREFIX = "KHAZNA-SYNC-1:";
+  var SYNC_HASH_KEY = "sync=";
+  var SYNC_PBKDF2_ITERATIONS = 6e5;
+  var SYNC_MAX_SAFE_URL_CHARS = 24e3;
+  var SYNC_MAGIC = new Uint8Array([75, 90, 83, 1]);
+  var FLAG_GZIP = 1;
+  async function tryGzipCompress(bytes) {
+    if (typeof CompressionStream !== "function") {
+      return { bytes, compressed: false };
+    }
+    try {
+      const cs = new CompressionStream("gzip");
+      const writer = cs.writable.getWriter();
+      writer.write(bytes);
+      writer.close();
+      const out = new Uint8Array(await new Response(cs.readable).arrayBuffer());
+      if (out.length < bytes.length) {
+        return { bytes: out, compressed: true };
+      }
+      return { bytes, compressed: false };
+    } catch {
+      return { bytes, compressed: false };
+    }
+  }
+  async function tryGzipDecompress(bytes) {
+    if (typeof DecompressionStream !== "function") {
+      throw new KhaznaError(
+        "SYNC_DECOMPRESS_UNSUPPORTED",
+        "\u0627\u0644\u0645\u062A\u0635\u0641\u062D \u0627\u0644\u062D\u0627\u0644\u064A \u0644\u0627 \u064A\u062F\u0639\u0645 \u0641\u0643 \u0636\u063A\u0637 gzip \u0644\u062D\u0632\u0645\u0629 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629.",
+        "This browser does not support gzip decompression for sync payloads."
+      );
+    }
+    const ds = new DecompressionStream("gzip");
+    const writer = ds.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+  }
+  function buildSyncAad(compressed) {
+    return utf8Encode(`khazna:sync:v1|comp=${compressed ? "gzip" : "raw"}`);
+  }
+  function selectSyncRecords({
+    sections = [],
+    passwords = [],
+    cards = [],
+    notes = [],
+    mode = "delta",
+    sinceIso = null
+  }) {
+    const cutoffMs = mode === "delta" && sinceIso ? Date.parse(sinceIso) : 0;
+    const isIncluded = (rec) => {
+      if (!cutoffMs || Number.isNaN(cutoffMs)) return true;
+      const ts = Date.parse(rec.updatedAt || rec.createdAt || "");
+      return Number.isNaN(ts) || ts >= cutoffMs;
+    };
+    const selPasswords = passwords.filter((p) => !p.deletedAt && isIncluded(p));
+    const selCards = cards.filter((c) => !c.deletedAt && isIncluded(c));
+    const selNotes = notes.filter((n) => !n.deletedAt && isIncluded(n));
+    const referencedSecIds = new Set(selPasswords.map((p) => p.data?.sectionId).filter(Boolean));
+    const selSections = sections.filter(
+      (s) => !s.deletedAt && (mode === "full" || isIncluded(s) || referencedSecIds.has(s.id))
+    );
+    return {
+      v: 1,
+      mode,
+      since: mode === "delta" ? sinceIso : null,
+      exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      sections: selSections.map((s) => ({
+        id: s.id,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+        data: s.data
+      })),
+      passwords: selPasswords.map((p) => ({
+        id: p.id,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        data: p.data
+      })),
+      cards: selCards.map((c) => ({
+        id: c.id,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        data: c.data
+      })),
+      notes: selNotes.map((n) => ({
+        id: n.id,
+        createdAt: n.createdAt,
+        updatedAt: n.updatedAt,
+        data: n.data
+      }))
+    };
+  }
+  async function encodeSyncPackage({
+    payload,
+    passphrase,
+    iterations = SYNC_PBKDF2_ITERATIONS,
+    useCompression = true
+  }) {
+    if (!passphrase || String(passphrase).length < 4) {
+      throw new KhaznaError(
+        "SYNC_PASS_TOO_SHORT",
+        "\u064A\u062C\u0628 \u0625\u062F\u062E\u0627\u0644 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0644\u0644\u0645\u0632\u0627\u0645\u0646\u0629 (\u0664 \u0623\u062D\u0631\u0641 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644\u060C \u0648\u064A\u064F\u0641\u0636\u0651\u0644 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0642\u0648\u064A\u0629).",
+        "Enter a sync passphrase (at least 4 characters; a strong passphrase is recommended)."
+      );
+    }
+    const rawJson = utf8Encode(JSON.stringify(payload));
+    const { bytes: bodyBytes, compressed } = useCompression ? await tryGzipCompress(rawJson) : { bytes: rawJson, compressed: false };
+    const salt = randomBytes(16);
+    const iv = randomBytes(12);
+    const pwdBytes = utf8Encode(String(passphrase));
+    let keyBytes = null;
+    try {
+      keyBytes = await derivePbkdf2Sha256(pwdBytes, salt, iterations, 32);
+      const aesKey = await globalThis.crypto.subtle.importKey(
+        "raw",
+        keyBytes,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt"]
+      );
+      const aad = buildSyncAad(compressed);
+      const ctBuf = await globalThis.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv, additionalData: aad, tagLength: 128 },
+        aesKey,
+        bodyBytes
+      );
+      const flags = new Uint8Array([compressed ? FLAG_GZIP : 0]);
+      const packet = concatBytes(SYNC_MAGIC, flags, salt, iv, new Uint8Array(ctBuf));
+      const token = bytesToBase64Url(packet);
+      const code = `${SYNC_PREFIX}${token}`;
+      return {
+        code,
+        token,
+        compressed,
+        byteLength: packet.length,
+        counts: {
+          sections: payload.sections?.length || 0,
+          passwords: payload.passwords?.length || 0,
+          cards: payload.cards?.length || 0,
+          notes: payload.notes?.length || 0
+        }
+      };
+    } finally {
+      zeroize(pwdBytes, rawJson, bodyBytes, keyBytes);
+    }
+  }
+  function extractSyncTokenFromInput(input) {
+    const trimmed = String(input || "").trim();
+    if (!trimmed) return "";
+    const hashIdx = trimmed.indexOf("#");
+    if (hashIdx !== -1) {
+      const frag = trimmed.slice(hashIdx + 1);
+      const params = new URLSearchParams(frag);
+      const fromParam = params.get("sync");
+      if (fromParam) return fromParam.replace(/\s+/g, "");
+    }
+    if (trimmed.startsWith(SYNC_HASH_KEY)) {
+      return trimmed.slice(SYNC_HASH_KEY.length).replace(/\s+/g, "");
+    }
+    if (trimmed.toUpperCase().startsWith(SYNC_PREFIX)) {
+      return trimmed.slice(SYNC_PREFIX.length).replace(/\s+/g, "");
+    }
+    return trimmed.replace(/\s+/g, "");
+  }
+  function buildSyncLink(baseUrl, token) {
+    const cleanBase = String(baseUrl || "").split("#")[0].split("?")[0];
+    const url = `${cleanBase}#sync=${token}`;
+    return {
+      url,
+      length: url.length,
+      fitsUrl: url.length <= SYNC_MAX_SAFE_URL_CHARS
+    };
+  }
+  async function decodeSyncPackage({
+    input,
+    passphrase,
+    iterations = SYNC_PBKDF2_ITERATIONS
+  }) {
+    const token = extractSyncTokenFromInput(input);
+    if (!token) {
+      throw new KhaznaError(
+        "SYNC_EMPTY",
+        "\u064A\u0631\u062C\u0649 \u0644\u0635\u0642 \u0643\u0648\u062F \u0623\u0648 \u0631\u0627\u0628\u0637 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u0627\u0644\u0645\u0634\u0641\u0651\u0631 \u0623\u0648\u0644\u0627\u064B.",
+        "Please paste an encrypted sync code or link first."
+      );
+    }
+    if (!passphrase) {
+      throw new KhaznaError(
+        "SYNC_PASS_REQUIRED",
+        "\u064A\u0631\u062C\u0649 \u0625\u062F\u062E\u0627\u0644 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u0644\u0641\u0643 \u0627\u0644\u062A\u0634\u0641\u064A\u0631.",
+        "Please enter the sync passphrase to decrypt."
+      );
+    }
+    let packet;
+    try {
+      packet = base64UrlToBytes(token);
+    } catch {
+      throw new KhaznaError(
+        "SYNC_INVALID_FORMAT",
+        "\u062A\u0646\u0633\u064A\u0642 \u0643\u0648\u062F \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D \u0623\u0648 \u0646\u0627\u0642\u0635.",
+        "Sync code format is invalid or truncated."
+      );
+    }
+    if (packet.length < 4 + 1 + 16 + 12 + 16 || packet[0] !== SYNC_MAGIC[0] || packet[1] !== SYNC_MAGIC[1] || packet[2] !== SYNC_MAGIC[2] || packet[3] !== SYNC_MAGIC[3]) {
+      throw new KhaznaError(
+        "SYNC_INVALID_MAGIC",
+        "\u0647\u0630\u0627 \u0627\u0644\u0643\u0648\u062F \u0644\u064A\u0633 \u062D\u0632\u0645\u0629 \u0645\u0632\u0627\u0645\u0646\u0629 \u0635\u0627\u0644\u062D\u0629 \u0645\u0646 \u062E\u0632\u0646\u0629.",
+        "This code is not a valid Khazna sync package."
+      );
+    }
+    const flags = packet[4];
+    const compressed = Boolean(flags & FLAG_GZIP);
+    const salt = packet.subarray(5, 21);
+    const iv = packet.subarray(21, 33);
+    const ciphertext = packet.subarray(33);
+    const pwdBytes = utf8Encode(String(passphrase));
+    let keyBytes = null;
+    let plainBytes = null;
+    try {
+      keyBytes = await derivePbkdf2Sha256(pwdBytes, salt, iterations, 32);
+      const aesKey = await globalThis.crypto.subtle.importKey(
+        "raw",
+        keyBytes,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"]
+      );
+      const aad = buildSyncAad(compressed);
+      let decryptedBuf;
+      try {
+        decryptedBuf = await globalThis.crypto.subtle.decrypt(
+          { name: "AES-GCM", iv, additionalData: aad, tagLength: 128 },
+          aesKey,
+          ciphertext
+        );
+      } catch {
+        throw new KhaznaError(
+          "SYNC_DECRYPT_FAILED",
+          "\u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629 \u0623\u0648 \u062A\u0645 \u0627\u0644\u062A\u0644\u0627\u0639\u0628 \u0628\u0627\u0644\u0643\u0648\u062F.",
+          "Incorrect sync passphrase or tampered sync code."
+        );
+      }
+      plainBytes = compressed ? await tryGzipDecompress(new Uint8Array(decryptedBuf)) : new Uint8Array(decryptedBuf);
+      const parsed = JSON.parse(utf8Decode(plainBytes));
+      if (!parsed || parsed.v !== 1) {
+        throw new KhaznaError(
+          "SYNC_UNSUPPORTED_VERSION",
+          "\u0625\u0635\u062F\u0627\u0631 \u062D\u0632\u0645\u0629 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645.",
+          "Unsupported sync package version."
+        );
+      }
+      return parsed;
+    } finally {
+      zeroize(pwdBytes, keyBytes, plainBytes);
+    }
+  }
+  function normText(v) {
+    return String(v || "").trim().toLowerCase();
+  }
+  function naturalKey(type, data = {}) {
+    if (type === "section") return `sec:${normText(data.name)}`;
+    if (type === "password") return `pwd:${normText(data.title)}|${normText(data.username)}|${normText(data.url)}`;
+    if (type === "card") {
+      const digits = String(data.number || "").replace(/\D/g, "");
+      const last4 = digits.slice(-4) || String(data.last4 || "");
+      return `crd:${normText(data.title)}|${last4}`;
+    }
+    if (type === "note") return `not:${normText(data.title)}`;
+    return "";
+  }
+  function stableDataEquals(a, b) {
+    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  }
+  function parseTs(iso) {
+    const n = Date.parse(iso || "");
+    return Number.isNaN(n) ? 0 : n;
+  }
+  function planSyncMerge({
+    incoming,
+    localSections = [],
+    localPasswords = [],
+    localCards = [],
+    localNotes = [],
+    strategy = "smart"
+    // 'smart' | 'add-only'
+  }) {
+    const sectionIdMap = /* @__PURE__ */ new Map();
+    const sectionActions = [];
+    const localSecById = new Map(localSections.map((s) => [s.id, s]));
+    const localSecByKey = new Map(localSections.map((s) => [naturalKey("section", s.data), s]));
+    for (const inc of incoming.sections || []) {
+      const match = localSecById.get(inc.id) || localSecByKey.get(naturalKey("section", inc.data));
+      if (!match) {
+        const newId = inc.id || randomId("sec");
+        sectionIdMap.set(inc.id, newId);
+        sectionActions.push({ action: "add", id: newId, data: inc.data, updatedAt: inc.updatedAt });
+      } else {
+        sectionIdMap.set(inc.id, match.id);
+        if (strategy === "smart" && parseTs(inc.updatedAt) > parseTs(match.updatedAt) && !stableDataEquals(inc.data, match.data)) {
+          sectionActions.push({ action: "update", id: match.id, data: inc.data, updatedAt: inc.updatedAt });
+        } else {
+          sectionActions.push({ action: "unchanged", id: match.id });
+        }
+      }
+    }
+    const planType = (type, incList, localList, transformData = (d) => d) => {
+      const byId = new Map(localList.map((r) => [r.id, r]));
+      const byKey = new Map(localList.map((r) => [naturalKey(type, r.data), r]));
+      const actions = [];
+      for (const inc of incList || []) {
+        const data = transformData(inc.data || {});
+        const key = naturalKey(type, data);
+        const match = byId.get(inc.id) || (key ? byKey.get(key) : null);
+        if (!match) {
+          actions.push({
+            action: "add",
+            id: inc.id || randomId(type.slice(0, 3)),
+            data,
+            createdAt: inc.createdAt,
+            updatedAt: inc.updatedAt
+          });
+        } else if (strategy === "smart" && parseTs(inc.updatedAt) > parseTs(match.updatedAt) && !stableDataEquals(data, match.data)) {
+          actions.push({
+            action: "update",
+            id: match.id,
+            data,
+            createdAt: match.createdAt,
+            updatedAt: inc.updatedAt
+          });
+        } else {
+          actions.push({ action: "unchanged", id: match.id });
+        }
+      }
+      return actions;
+    };
+    const passwordActions = planType("password", incoming.passwords, localPasswords, (d) => ({
+      ...d,
+      sectionId: d.sectionId ? sectionIdMap.get(d.sectionId) || d.sectionId : null
+    }));
+    const cardActions = planType("card", incoming.cards, localCards);
+    const noteActions = planType("note", incoming.notes, localNotes);
+    const count = (arr, kind) => arr.filter((x) => x.action === kind).length;
+    return {
+      mode: incoming.mode || "full",
+      exportedAt: incoming.exportedAt || null,
+      sections: sectionActions,
+      passwords: passwordActions,
+      cards: cardActions,
+      notes: noteActions,
+      summary: {
+        added: count(sectionActions, "add") + count(passwordActions, "add") + count(cardActions, "add") + count(noteActions, "add"),
+        updated: count(sectionActions, "update") + count(passwordActions, "update") + count(cardActions, "update") + count(noteActions, "update"),
+        unchanged: count(sectionActions, "unchanged") + count(passwordActions, "unchanged") + count(cardActions, "unchanged") + count(noteActions, "unchanged"),
+        passwordsAdded: count(passwordActions, "add"),
+        passwordsUpdated: count(passwordActions, "update"),
+        cardsAdded: count(cardActions, "add"),
+        cardsUpdated: count(cardActions, "update"),
+        notesAdded: count(noteActions, "add"),
+        notesUpdated: count(noteActions, "update")
+      }
+    };
+  }
+  async function applySyncMerge({ session: session2, plan }) {
+    const itemsToEncrypt = [];
+    for (const s of plan.sections) {
+      if (s.action === "add" || s.action === "update") {
+        itemsToEncrypt.push({ type: "section", id: s.id, data: s.data, createdAt: s.createdAt });
+      }
+    }
+    for (const p of plan.passwords) {
+      if (p.action === "add" || p.action === "update") {
+        itemsToEncrypt.push({ type: "password", id: p.id, data: p.data, createdAt: p.createdAt });
+      }
+    }
+    for (const c of plan.cards) {
+      if (c.action === "add" || c.action === "update") {
+        itemsToEncrypt.push({ type: "card", id: c.id, data: c.data, createdAt: c.createdAt });
+      }
+    }
+    for (const n of plan.notes) {
+      if (n.action === "add" || n.action === "update") {
+        itemsToEncrypt.push({ type: "note", id: n.id, data: n.data, createdAt: n.createdAt });
+      }
+    }
+    let snapshotId = null;
+    if (itemsToEncrypt.length > 0) {
+      const encryptedBatch = await session2.encryptBatchForAtomicWrite(itemsToEncrypt);
+      snapshotId = await session2.storage.atomicOperationWithSnapshot({
+        reason: "device-sync",
+        putRecords: encryptedBatch
+      });
+    }
+    await session2.updateSettings({ lastSyncAt: (/* @__PURE__ */ new Date()).toISOString() });
+    return {
+      snapshotId,
+      appliedCount: itemsToEncrypt.length,
+      summary: plan.summary
+    };
+  }
 
   // src/auth/webauthn.js
   var CONVENIENCE_MAX_AGE_MS = 24 * 60 * 60 * 1e3;
@@ -2893,6 +3399,15 @@
     get isBlurred() {
       return this._blurred;
     }
+    get unlockMethod() {
+      return this._header?.unlockMethod === "pattern" ? "pattern" : "password";
+    }
+    get hasPatternUnlock() {
+      return this.unlockMethod === "pattern" || this._header?.wrappers?.alt?.method === "pattern";
+    }
+    get hasPasswordUnlock() {
+      return this.unlockMethod === "password" || this._header?.wrappers?.alt?.method === "password";
+    }
     async init() {
       await this.refreshMeta();
       return {
@@ -3040,6 +3555,43 @@
         header,
         recoveryKeyFormatted,
         kdfEngine
+      };
+    }
+    /**
+     * Creates a new vault on a new device directly from an old device's encrypted Sync Code,
+     * using the EXACT same Pattern or Master Password as the old device so both devices stay in sync.
+     */
+    async createVaultFromSyncCode({ syncInput, secret, kdfSpec = null, enforceMinimums = true }) {
+      const incoming = await decodeSyncPackage({
+        input: syncInput,
+        passphrase: secret
+      });
+      const hasIncomingSections = Array.isArray(incoming.sections) && incoming.sections.length > 0;
+      const created = await this.createVault({
+        masterPassword: secret,
+        kdfSpec,
+        enforceMinimums,
+        seedDefaultSections: !hasIncomingSections
+      });
+      const localSections = await this.listRecords("section");
+      const plan = planSyncMerge({
+        incoming,
+        localSections,
+        localPasswords: [],
+        localCards: [],
+        localNotes: [],
+        strategy: "smart"
+      });
+      const merged = await applySyncMerge({ session: this, plan });
+      return {
+        ...created,
+        summary: merged.summary,
+        counts: {
+          sections: incoming.sections?.length || 0,
+          passwords: incoming.passwords?.length || 0,
+          cards: incoming.cards?.length || 0,
+          notes: incoming.notes?.length || 0
+        }
       };
     }
     /**
@@ -3381,6 +3933,22 @@
       this._emit("header-updated", { reason: "master-password-change" });
       return { kdfEngine };
     }
+    async setSecondaryUnlock({ currentSecret, altSecret }) {
+      this._assertUnlocked();
+      const { updatedHeader } = await setAltUnlockWrapper({
+        header: this._header,
+        currentSecret,
+        altSecret,
+        useWorker: this._useWorker
+      });
+      await this.storage.atomicOperationWithSnapshot({
+        reason: "set-secondary-unlock",
+        newHeader: updatedHeader
+      });
+      this._header = updatedHeader;
+      this._emit("header-updated", { reason: "set-secondary-unlock" });
+      return true;
+    }
     async rotateRecoveryKeyWithPassword(masterPassword) {
       this._assertUnlocked();
       const { updatedHeader, recoveryKeyFormatted } = await rotateRecoveryKey({
@@ -3593,7 +4161,9 @@
     }
     handleVisibilityChange(hidden) {
       if (hidden) {
-        this.setPrivacyBlur(true);
+        if (this._settings?.privacyBlurOnBlur === true) {
+          this.setPrivacyBlur(true);
+        }
         if (this.isUnlocked) {
           const graceSec = Math.max(0, Math.min(300, this._settings?.bgGraceSec ?? 15));
           if (this._bgTimer) clearTimeout(this._bgTimer);
@@ -3879,7 +4449,25 @@
       syncSettingsBtn: "\u0645\u0632\u0627\u0645\u0646\u0629 \u0628\u064A\u0646 \u0627\u0644\u0623\u062C\u0647\u0632\u0629 (\u0631\u0627\u0628\u0637 / \u0643\u0648\u062F)",
       downloadZipBtn: "\u062A\u0646\u0632\u064A\u0644 \u0645\u0644\u0641\u0627\u062A \u0627\u0644\u062A\u0637\u0628\u064A\u0642 (khazna-pwa.zip)",
       downloadZipShort: "ZIP",
-      downloadZipToast: "\u0628\u062F\u0623 \u062A\u0646\u0632\u064A\u0644 \u0645\u0644\u0641 khazna-pwa.zip \u2713"
+      downloadZipToast: "\u0628\u062F\u0623 \u062A\u0646\u0632\u064A\u0644 \u0645\u0644\u0641 khazna-pwa.zip \u2713",
+      patternTabLabel: "\u0627\u0644\u0646\u0645\u0637 \u0627\u0644\u0633\u0631\u064A\u0639 (\u0645\u0648\u0635\u0649 \u0628\u0647)",
+      passwordTabLabel: "\u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 (\u0625\u0636\u0627\u0641\u064A)",
+      transferTabLabel: "\u0646\u0642\u0644 \u0645\u0646 \u062C\u0647\u0627\u0632 \u0642\u062F\u064A\u0645",
+      patternDrawFirst: "\u0627\u0631\u0633\u0645 \u0627\u0644\u0646\u0645\u0637 \u0627\u0644\u062E\u0627\u0635 \u0628\u0643 \u0628\u0627\u0644\u0645\u0627\u0648\u0633 \u0623\u0648 \u0627\u0644\u0625\u0635\u0628\u0639 (\u0664 \u0646\u0642\u0627\u0637 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644)",
+      patternDrawConfirm: "\u0623\u0639\u062F \u0631\u0633\u0645 \u0646\u0641\u0633 \u0627\u0644\u0646\u0645\u0637 \u0644\u0644\u062A\u0623\u0643\u064A\u062F",
+      patternMismatch: "\u0627\u0644\u0646\u0645\u0637\u0627\u0646 \u063A\u064A\u0631 \u0645\u062A\u0637\u0627\u0628\u0642\u064A\u0646 \u2014 \u0623\u0639\u062F \u0627\u0644\u0645\u062D\u0627\u0648\u0644\u0629.",
+      patternDrawUnlock: "\u0627\u0631\u0633\u0645 \u0627\u0644\u0646\u0645\u0637 \u0644\u0641\u062A\u062D \u0627\u0644\u062E\u0632\u0646\u0629",
+      usePatternUnlock: "\u0627\u0644\u0641\u062A\u062D \u0628\u0627\u0644\u0646\u0645\u0637",
+      usePasswordUnlock: "\u0627\u0644\u0641\u062A\u062D \u0628\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631",
+      transferFromOldTitle: "\u0646\u0642\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0645\u0646 \u062C\u0647\u0627\u0632 \u0642\u062F\u064A\u0645 \u0628\u0627\u0644\u0643\u0648\u062F",
+      transferFromOldSub: "\u0627\u0644\u0635\u0642 \u0643\u0648\u062F \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u0645\u0646 \u062C\u0647\u0627\u0632\u0643 \u0627\u0644\u0642\u062F\u064A\u0645 \u062B\u0645 \u0627\u0631\u0633\u0645 \u0646\u0641\u0633 \u0627\u0644\u0646\u0645\u0637 \u0623\u0648 \u0623\u062F\u062E\u0644 \u0646\u0641\u0633 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u2014 \u0633\u064A\u062A\u0645 \u0625\u0646\u0634\u0627\u0621 \u062E\u0632\u0646\u062A\u0643 \u0628\u0646\u0641\u0633 \u0627\u0644\u0642\u0641\u0644 \u0648\u0646\u0642\u0644 \u0643\u0644 \u0628\u064A\u0627\u0646\u0627\u062A\u0643 \u0641\u0648\u0631\u0627\u064B.",
+      transferFromOldBtn: "\u0646\u0642\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0645\u0646 \u062C\u0647\u0627\u0632 \u0642\u062F\u064A\u0645 (\u0628\u0627\u0644\u0643\u0648\u062F)",
+      transferStartBtn: "\u0641\u0643 \u0627\u0644\u062A\u0634\u0641\u064A\u0631 \u0648\u0646\u0642\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0622\u0646",
+      changePatternBtn: "\u062A\u0639\u064A\u064A\u0646 / \u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u0646\u0645\u0637",
+      addOptionalPasswordBtn: "\u0625\u0636\u0627\u0641\u0629 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0625\u0636\u0627\u0641\u064A\u0629",
+      privacyBlurLabel: "\u0625\u062E\u0641\u0627\u0621 \u0627\u0644\u0634\u0627\u0634\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B \u0639\u0646\u062F \u0645\u063A\u0627\u062F\u0631\u0629 \u0627\u0644\u0646\u0627\u0641\u0630\u0629 (\u064A\u0639\u064A\u0642 \u0644\u0642\u0637\u0627\u062A \u0627\u0644\u0634\u0627\u0634\u0629 \u0641\u064A \u0627\u0644\u0645\u062A\u0635\u0641\u062D)",
+      copyNumberShort: "\u0646\u0633\u062E \u0627\u0644\u0631\u0642\u0645",
+      syncLockMethodHint: "\u0627\u0633\u062A\u062E\u062F\u0645 \u0646\u0641\u0633 \u0627\u0644\u0646\u0645\u0637 \u0623\u0648 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0645\u0648\u062C\u0648\u062F\u0629 \u0641\u064A \u062E\u0632\u0646\u062A\u0643 \u062D\u062A\u0649 \u062A\u062A\u0637\u0627\u0628\u0642 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u0628\u0633\u0647\u0648\u0644\u0629 \u0628\u064A\u0646 \u0627\u0644\u062C\u0647\u0627\u0632\u064A\u0646."
     },
     en: {
       appName: "Khazna",
@@ -4124,7 +4712,25 @@
       syncSettingsBtn: "Device Sync (Link / Code)",
       downloadZipBtn: "Download App Files (khazna-pwa.zip)",
       downloadZipShort: "ZIP",
-      downloadZipToast: "Downloading khazna-pwa.zip \u2713"
+      downloadZipToast: "Downloading khazna-pwa.zip \u2713",
+      patternTabLabel: "Quick Pattern (Recommended)",
+      passwordTabLabel: "Password (Optional)",
+      transferTabLabel: "Transfer from Old Device",
+      patternDrawFirst: "Draw your unlock pattern with mouse or finger (4+ dots)",
+      patternDrawConfirm: "Draw the same pattern again to confirm",
+      patternMismatch: "Patterns did not match \u2014 please try again.",
+      patternDrawUnlock: "Draw your pattern to unlock",
+      usePatternUnlock: "Unlock with Pattern",
+      usePasswordUnlock: "Unlock with Password",
+      transferFromOldTitle: "Transfer from Old Device via Code",
+      transferFromOldSub: "Paste the sync code from your old device and draw the same pattern (or enter the same password) \u2014 your vault will be created with the same lock and all data synced.",
+      transferFromOldBtn: "Transfer from Old Device (via Code)",
+      transferStartBtn: "Decrypt & Transfer Data Now",
+      changePatternBtn: "Set / Change Pattern",
+      addOptionalPasswordBtn: "Add Optional Password",
+      privacyBlurLabel: "Blur screen automatically when window loses focus (blocks browser screenshots)",
+      copyNumberShort: "Copy Number",
+      syncLockMethodHint: "Use the same Pattern or Password as your vault so both devices share the exact same lock for easy syncing."
     }
   };
   function t(lang, key) {
@@ -4138,408 +4744,6 @@
       if (err.message) return err.message;
     }
     return lang === "en" ? "Unexpected error occurred." : "\u062D\u062F\u062B \u062E\u0637\u0623 \u063A\u064A\u0631 \u0645\u062A\u0648\u0642\u0639.";
-  }
-
-  // src/import-export/sync.js
-  var SYNC_PREFIX = "KHAZNA-SYNC-1:";
-  var SYNC_HASH_KEY = "sync=";
-  var SYNC_PBKDF2_ITERATIONS = 6e5;
-  var SYNC_MAX_SAFE_URL_CHARS = 24e3;
-  var SYNC_MAGIC = new Uint8Array([75, 90, 83, 1]);
-  var FLAG_GZIP = 1;
-  async function tryGzipCompress(bytes) {
-    if (typeof CompressionStream !== "function") {
-      return { bytes, compressed: false };
-    }
-    try {
-      const cs = new CompressionStream("gzip");
-      const writer = cs.writable.getWriter();
-      writer.write(bytes);
-      writer.close();
-      const out = new Uint8Array(await new Response(cs.readable).arrayBuffer());
-      if (out.length < bytes.length) {
-        return { bytes: out, compressed: true };
-      }
-      return { bytes, compressed: false };
-    } catch {
-      return { bytes, compressed: false };
-    }
-  }
-  async function tryGzipDecompress(bytes) {
-    if (typeof DecompressionStream !== "function") {
-      throw new KhaznaError(
-        "SYNC_DECOMPRESS_UNSUPPORTED",
-        "\u0627\u0644\u0645\u062A\u0635\u0641\u062D \u0627\u0644\u062D\u0627\u0644\u064A \u0644\u0627 \u064A\u062F\u0639\u0645 \u0641\u0643 \u0636\u063A\u0637 gzip \u0644\u062D\u0632\u0645\u0629 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629.",
-        "This browser does not support gzip decompression for sync payloads."
-      );
-    }
-    const ds = new DecompressionStream("gzip");
-    const writer = ds.writable.getWriter();
-    writer.write(bytes);
-    writer.close();
-    return new Uint8Array(await new Response(ds.readable).arrayBuffer());
-  }
-  function buildSyncAad(compressed) {
-    return utf8Encode(`khazna:sync:v1|comp=${compressed ? "gzip" : "raw"}`);
-  }
-  function selectSyncRecords({
-    sections = [],
-    passwords = [],
-    cards = [],
-    notes = [],
-    mode = "delta",
-    sinceIso = null
-  }) {
-    const cutoffMs = mode === "delta" && sinceIso ? Date.parse(sinceIso) : 0;
-    const isIncluded = (rec) => {
-      if (!cutoffMs || Number.isNaN(cutoffMs)) return true;
-      const ts = Date.parse(rec.updatedAt || rec.createdAt || "");
-      return Number.isNaN(ts) || ts >= cutoffMs;
-    };
-    const selPasswords = passwords.filter((p) => !p.deletedAt && isIncluded(p));
-    const selCards = cards.filter((c) => !c.deletedAt && isIncluded(c));
-    const selNotes = notes.filter((n) => !n.deletedAt && isIncluded(n));
-    const referencedSecIds = new Set(selPasswords.map((p) => p.data?.sectionId).filter(Boolean));
-    const selSections = sections.filter(
-      (s) => !s.deletedAt && (mode === "full" || isIncluded(s) || referencedSecIds.has(s.id))
-    );
-    return {
-      v: 1,
-      mode,
-      since: mode === "delta" ? sinceIso : null,
-      exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      sections: selSections.map((s) => ({
-        id: s.id,
-        createdAt: s.createdAt,
-        updatedAt: s.updatedAt,
-        data: s.data
-      })),
-      passwords: selPasswords.map((p) => ({
-        id: p.id,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
-        data: p.data
-      })),
-      cards: selCards.map((c) => ({
-        id: c.id,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-        data: c.data
-      })),
-      notes: selNotes.map((n) => ({
-        id: n.id,
-        createdAt: n.createdAt,
-        updatedAt: n.updatedAt,
-        data: n.data
-      }))
-    };
-  }
-  async function encodeSyncPackage({
-    payload,
-    passphrase,
-    iterations = SYNC_PBKDF2_ITERATIONS,
-    useCompression = true
-  }) {
-    if (!passphrase || String(passphrase).length < 4) {
-      throw new KhaznaError(
-        "SYNC_PASS_TOO_SHORT",
-        "\u064A\u062C\u0628 \u0625\u062F\u062E\u0627\u0644 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0644\u0644\u0645\u0632\u0627\u0645\u0646\u0629 (\u0664 \u0623\u062D\u0631\u0641 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644\u060C \u0648\u064A\u064F\u0641\u0636\u0651\u0644 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0642\u0648\u064A\u0629).",
-        "Enter a sync passphrase (at least 4 characters; a strong passphrase is recommended)."
-      );
-    }
-    const rawJson = utf8Encode(JSON.stringify(payload));
-    const { bytes: bodyBytes, compressed } = useCompression ? await tryGzipCompress(rawJson) : { bytes: rawJson, compressed: false };
-    const salt = randomBytes(16);
-    const iv = randomBytes(12);
-    const pwdBytes = utf8Encode(String(passphrase));
-    let keyBytes = null;
-    try {
-      keyBytes = await derivePbkdf2Sha256(pwdBytes, salt, iterations, 32);
-      const aesKey = await globalThis.crypto.subtle.importKey(
-        "raw",
-        keyBytes,
-        { name: "AES-GCM", length: 256 },
-        false,
-        ["encrypt"]
-      );
-      const aad = buildSyncAad(compressed);
-      const ctBuf = await globalThis.crypto.subtle.encrypt(
-        { name: "AES-GCM", iv, additionalData: aad, tagLength: 128 },
-        aesKey,
-        bodyBytes
-      );
-      const flags = new Uint8Array([compressed ? FLAG_GZIP : 0]);
-      const packet = concatBytes(SYNC_MAGIC, flags, salt, iv, new Uint8Array(ctBuf));
-      const token = bytesToBase64Url(packet);
-      const code = `${SYNC_PREFIX}${token}`;
-      return {
-        code,
-        token,
-        compressed,
-        byteLength: packet.length,
-        counts: {
-          sections: payload.sections?.length || 0,
-          passwords: payload.passwords?.length || 0,
-          cards: payload.cards?.length || 0,
-          notes: payload.notes?.length || 0
-        }
-      };
-    } finally {
-      zeroize(pwdBytes, rawJson, bodyBytes, keyBytes);
-    }
-  }
-  function extractSyncTokenFromInput(input) {
-    const trimmed = String(input || "").trim();
-    if (!trimmed) return "";
-    const hashIdx = trimmed.indexOf("#");
-    if (hashIdx !== -1) {
-      const frag = trimmed.slice(hashIdx + 1);
-      const params = new URLSearchParams(frag);
-      const fromParam = params.get("sync");
-      if (fromParam) return fromParam.replace(/\s+/g, "");
-    }
-    if (trimmed.startsWith(SYNC_HASH_KEY)) {
-      return trimmed.slice(SYNC_HASH_KEY.length).replace(/\s+/g, "");
-    }
-    if (trimmed.toUpperCase().startsWith(SYNC_PREFIX)) {
-      return trimmed.slice(SYNC_PREFIX.length).replace(/\s+/g, "");
-    }
-    return trimmed.replace(/\s+/g, "");
-  }
-  function buildSyncLink(baseUrl, token) {
-    const cleanBase = String(baseUrl || "").split("#")[0].split("?")[0];
-    const url = `${cleanBase}#sync=${token}`;
-    return {
-      url,
-      length: url.length,
-      fitsUrl: url.length <= SYNC_MAX_SAFE_URL_CHARS
-    };
-  }
-  async function decodeSyncPackage({
-    input,
-    passphrase,
-    iterations = SYNC_PBKDF2_ITERATIONS
-  }) {
-    const token = extractSyncTokenFromInput(input);
-    if (!token) {
-      throw new KhaznaError(
-        "SYNC_EMPTY",
-        "\u064A\u0631\u062C\u0649 \u0644\u0635\u0642 \u0643\u0648\u062F \u0623\u0648 \u0631\u0627\u0628\u0637 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u0627\u0644\u0645\u0634\u0641\u0651\u0631 \u0623\u0648\u0644\u0627\u064B.",
-        "Please paste an encrypted sync code or link first."
-      );
-    }
-    if (!passphrase) {
-      throw new KhaznaError(
-        "SYNC_PASS_REQUIRED",
-        "\u064A\u0631\u062C\u0649 \u0625\u062F\u062E\u0627\u0644 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u0644\u0641\u0643 \u0627\u0644\u062A\u0634\u0641\u064A\u0631.",
-        "Please enter the sync passphrase to decrypt."
-      );
-    }
-    let packet;
-    try {
-      packet = base64UrlToBytes(token);
-    } catch {
-      throw new KhaznaError(
-        "SYNC_INVALID_FORMAT",
-        "\u062A\u0646\u0633\u064A\u0642 \u0643\u0648\u062F \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D \u0623\u0648 \u0646\u0627\u0642\u0635.",
-        "Sync code format is invalid or truncated."
-      );
-    }
-    if (packet.length < 4 + 1 + 16 + 12 + 16 || packet[0] !== SYNC_MAGIC[0] || packet[1] !== SYNC_MAGIC[1] || packet[2] !== SYNC_MAGIC[2] || packet[3] !== SYNC_MAGIC[3]) {
-      throw new KhaznaError(
-        "SYNC_INVALID_MAGIC",
-        "\u0647\u0630\u0627 \u0627\u0644\u0643\u0648\u062F \u0644\u064A\u0633 \u062D\u0632\u0645\u0629 \u0645\u0632\u0627\u0645\u0646\u0629 \u0635\u0627\u0644\u062D\u0629 \u0645\u0646 \u062E\u0632\u0646\u0629.",
-        "This code is not a valid Khazna sync package."
-      );
-    }
-    const flags = packet[4];
-    const compressed = Boolean(flags & FLAG_GZIP);
-    const salt = packet.subarray(5, 21);
-    const iv = packet.subarray(21, 33);
-    const ciphertext = packet.subarray(33);
-    const pwdBytes = utf8Encode(String(passphrase));
-    let keyBytes = null;
-    let plainBytes = null;
-    try {
-      keyBytes = await derivePbkdf2Sha256(pwdBytes, salt, iterations, 32);
-      const aesKey = await globalThis.crypto.subtle.importKey(
-        "raw",
-        keyBytes,
-        { name: "AES-GCM", length: 256 },
-        false,
-        ["decrypt"]
-      );
-      const aad = buildSyncAad(compressed);
-      let decryptedBuf;
-      try {
-        decryptedBuf = await globalThis.crypto.subtle.decrypt(
-          { name: "AES-GCM", iv, additionalData: aad, tagLength: 128 },
-          aesKey,
-          ciphertext
-        );
-      } catch {
-        throw new KhaznaError(
-          "SYNC_DECRYPT_FAILED",
-          "\u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629 \u0623\u0648 \u062A\u0645 \u0627\u0644\u062A\u0644\u0627\u0639\u0628 \u0628\u0627\u0644\u0643\u0648\u062F.",
-          "Incorrect sync passphrase or tampered sync code."
-        );
-      }
-      plainBytes = compressed ? await tryGzipDecompress(new Uint8Array(decryptedBuf)) : new Uint8Array(decryptedBuf);
-      const parsed = JSON.parse(utf8Decode(plainBytes));
-      if (!parsed || parsed.v !== 1) {
-        throw new KhaznaError(
-          "SYNC_UNSUPPORTED_VERSION",
-          "\u0625\u0635\u062F\u0627\u0631 \u062D\u0632\u0645\u0629 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u063A\u064A\u0631 \u0645\u062F\u0639\u0648\u0645.",
-          "Unsupported sync package version."
-        );
-      }
-      return parsed;
-    } finally {
-      zeroize(pwdBytes, keyBytes, plainBytes);
-    }
-  }
-  function normText(v) {
-    return String(v || "").trim().toLowerCase();
-  }
-  function naturalKey(type, data = {}) {
-    if (type === "section") return `sec:${normText(data.name)}`;
-    if (type === "password") return `pwd:${normText(data.title)}|${normText(data.username)}|${normText(data.url)}`;
-    if (type === "card") {
-      const digits = String(data.number || "").replace(/\D/g, "");
-      const last4 = digits.slice(-4) || String(data.last4 || "");
-      return `crd:${normText(data.title)}|${last4}`;
-    }
-    if (type === "note") return `not:${normText(data.title)}`;
-    return "";
-  }
-  function stableDataEquals(a, b) {
-    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-  }
-  function parseTs(iso) {
-    const n = Date.parse(iso || "");
-    return Number.isNaN(n) ? 0 : n;
-  }
-  function planSyncMerge({
-    incoming,
-    localSections = [],
-    localPasswords = [],
-    localCards = [],
-    localNotes = [],
-    strategy = "smart"
-    // 'smart' | 'add-only'
-  }) {
-    const sectionIdMap = /* @__PURE__ */ new Map();
-    const sectionActions = [];
-    const localSecById = new Map(localSections.map((s) => [s.id, s]));
-    const localSecByKey = new Map(localSections.map((s) => [naturalKey("section", s.data), s]));
-    for (const inc of incoming.sections || []) {
-      const match = localSecById.get(inc.id) || localSecByKey.get(naturalKey("section", inc.data));
-      if (!match) {
-        const newId = inc.id || randomId("sec");
-        sectionIdMap.set(inc.id, newId);
-        sectionActions.push({ action: "add", id: newId, data: inc.data, updatedAt: inc.updatedAt });
-      } else {
-        sectionIdMap.set(inc.id, match.id);
-        if (strategy === "smart" && parseTs(inc.updatedAt) > parseTs(match.updatedAt) && !stableDataEquals(inc.data, match.data)) {
-          sectionActions.push({ action: "update", id: match.id, data: inc.data, updatedAt: inc.updatedAt });
-        } else {
-          sectionActions.push({ action: "unchanged", id: match.id });
-        }
-      }
-    }
-    const planType = (type, incList, localList, transformData = (d) => d) => {
-      const byId = new Map(localList.map((r) => [r.id, r]));
-      const byKey = new Map(localList.map((r) => [naturalKey(type, r.data), r]));
-      const actions = [];
-      for (const inc of incList || []) {
-        const data = transformData(inc.data || {});
-        const key = naturalKey(type, data);
-        const match = byId.get(inc.id) || (key ? byKey.get(key) : null);
-        if (!match) {
-          actions.push({
-            action: "add",
-            id: inc.id || randomId(type.slice(0, 3)),
-            data,
-            createdAt: inc.createdAt,
-            updatedAt: inc.updatedAt
-          });
-        } else if (strategy === "smart" && parseTs(inc.updatedAt) > parseTs(match.updatedAt) && !stableDataEquals(data, match.data)) {
-          actions.push({
-            action: "update",
-            id: match.id,
-            data,
-            createdAt: match.createdAt,
-            updatedAt: inc.updatedAt
-          });
-        } else {
-          actions.push({ action: "unchanged", id: match.id });
-        }
-      }
-      return actions;
-    };
-    const passwordActions = planType("password", incoming.passwords, localPasswords, (d) => ({
-      ...d,
-      sectionId: d.sectionId ? sectionIdMap.get(d.sectionId) || d.sectionId : null
-    }));
-    const cardActions = planType("card", incoming.cards, localCards);
-    const noteActions = planType("note", incoming.notes, localNotes);
-    const count = (arr, kind) => arr.filter((x) => x.action === kind).length;
-    return {
-      mode: incoming.mode || "full",
-      exportedAt: incoming.exportedAt || null,
-      sections: sectionActions,
-      passwords: passwordActions,
-      cards: cardActions,
-      notes: noteActions,
-      summary: {
-        added: count(sectionActions, "add") + count(passwordActions, "add") + count(cardActions, "add") + count(noteActions, "add"),
-        updated: count(sectionActions, "update") + count(passwordActions, "update") + count(cardActions, "update") + count(noteActions, "update"),
-        unchanged: count(sectionActions, "unchanged") + count(passwordActions, "unchanged") + count(cardActions, "unchanged") + count(noteActions, "unchanged"),
-        passwordsAdded: count(passwordActions, "add"),
-        passwordsUpdated: count(passwordActions, "update"),
-        cardsAdded: count(cardActions, "add"),
-        cardsUpdated: count(cardActions, "update"),
-        notesAdded: count(noteActions, "add"),
-        notesUpdated: count(noteActions, "update")
-      }
-    };
-  }
-  async function applySyncMerge({ session: session2, plan }) {
-    const itemsToEncrypt = [];
-    for (const s of plan.sections) {
-      if (s.action === "add" || s.action === "update") {
-        itemsToEncrypt.push({ type: "section", id: s.id, data: s.data, createdAt: s.createdAt });
-      }
-    }
-    for (const p of plan.passwords) {
-      if (p.action === "add" || p.action === "update") {
-        itemsToEncrypt.push({ type: "password", id: p.id, data: p.data, createdAt: p.createdAt });
-      }
-    }
-    for (const c of plan.cards) {
-      if (c.action === "add" || c.action === "update") {
-        itemsToEncrypt.push({ type: "card", id: c.id, data: c.data, createdAt: c.createdAt });
-      }
-    }
-    for (const n of plan.notes) {
-      if (n.action === "add" || n.action === "update") {
-        itemsToEncrypt.push({ type: "note", id: n.id, data: n.data, createdAt: n.createdAt });
-      }
-    }
-    let snapshotId = null;
-    if (itemsToEncrypt.length > 0) {
-      const encryptedBatch = await session2.encryptBatchForAtomicWrite(itemsToEncrypt);
-      snapshotId = await session2.storage.atomicOperationWithSnapshot({
-        reason: "device-sync",
-        putRecords: encryptedBatch
-      });
-    }
-    await session2.updateSettings({ lastSyncAt: (/* @__PURE__ */ new Date()).toISOString() });
-    return {
-      snapshotId,
-      appliedCount: itemsToEncrypt.length,
-      summary: plan.summary
-    };
   }
 
   // src/storage/idb.js
@@ -4559,6 +4763,7 @@
     clipboardClearSec: 30,
     copyComboMode: "two-step",
     reauthSensitive: true,
+    privacyBlurOnBlur: false,
     lowEndBlur: "auto",
     lastBackupAt: null,
     backupReminderDays: 7,
@@ -5237,6 +5442,264 @@
     return lines.join("\n");
   }
 
+  // src/ui/pattern-pad.js
+  var CENTERS = [
+    { x: 50, y: 50 },
+    { x: 150, y: 50 },
+    { x: 250, y: 50 },
+    { x: 50, y: 150 },
+    { x: 150, y: 150 },
+    { x: 250, y: 150 },
+    { x: 50, y: 250 },
+    { x: 150, y: 250 },
+    { x: 250, y: 250 }
+  ];
+  var MIDPOINTS = /* @__PURE__ */ new Map([
+    ["0-2", 1],
+    ["2-0", 1],
+    ["3-5", 4],
+    ["5-3", 4],
+    ["6-8", 7],
+    ["8-6", 7],
+    ["0-6", 3],
+    ["6-0", 3],
+    ["1-7", 4],
+    ["7-1", 4],
+    ["2-8", 5],
+    ["8-2", 5],
+    ["0-8", 4],
+    ["8-0", 4],
+    ["2-6", 4],
+    ["6-2", 4]
+  ]);
+  function createPatternPad({
+    lang = "ar",
+    hint = "",
+    onComplete = null,
+    onChange = null,
+    autoClearOnErrorMs = 800
+  } = {}) {
+    let selected = [];
+    let dragging = false;
+    let disabled = false;
+    let clearTimer = null;
+    const linesLayer = svgEl("g", { class: "pattern-lines" });
+    const liveLine = svgEl("line", {
+      class: "pattern-live-line hidden",
+      x1: 0,
+      y1: 0,
+      x2: 0,
+      y2: 0
+    });
+    const dotNodes = [];
+    const dotsLayer = svgEl("g", { class: "pattern-dots" });
+    for (let i = 0; i < 9; i++) {
+      const { x, y } = CENTERS[i];
+      const outer = svgEl("circle", {
+        class: "pattern-dot-ring",
+        cx: x,
+        cy: y,
+        r: 24
+      });
+      const core = svgEl("circle", {
+        class: "pattern-dot-core",
+        cx: x,
+        cy: y,
+        r: 8
+      });
+      const group = svgEl("g", { class: "pattern-dot", "data-dot": i }, outer, core);
+      dotNodes.push(group);
+      dotsLayer.appendChild(group);
+    }
+    const svg = svgEl(
+      "svg",
+      {
+        class: "pattern-svg",
+        viewBox: "0 0 300 300",
+        role: "application",
+        "aria-label": lang === "en" ? "3x3 Unlock Pattern Pad" : "\u0644\u0648\u062D\u0629 \u0631\u0633\u0645 \u0627\u0644\u0646\u0645\u0637 \u0663\xD7\u0663"
+      },
+      linesLayer,
+      liveLine,
+      dotsLayer
+    );
+    const defaultHint = hint || (lang === "en" ? "Drag across 4+ dots with mouse or finger" : "\u0627\u0633\u062D\u0628 \u0628\u0627\u0644\u0645\u0627\u0648\u0633 \u0623\u0648 \u0627\u0644\u0625\u0635\u0628\u0639 \u0644\u062A\u0648\u0635\u064A\u0644 \u0664 \u0646\u0642\u0627\u0637 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644");
+    const statusEl = el("div", { class: "pattern-status" }, defaultHint);
+    const renderState = () => {
+      while (linesLayer.firstChild) linesLayer.removeChild(linesLayer.firstChild);
+      for (let i = 0; i < dotNodes.length; i++) {
+        dotNodes[i].classList.toggle("is-active", selected.includes(i));
+      }
+      for (let i = 1; i < selected.length; i++) {
+        const a = CENTERS[selected[i - 1]];
+        const b = CENTERS[selected[i]];
+        linesLayer.appendChild(
+          svgEl("line", {
+            class: "pattern-line",
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y
+          })
+        );
+      }
+    };
+    const reset = (customHint = null) => {
+      if (clearTimer) {
+        clearTimeout(clearTimer);
+        clearTimer = null;
+      }
+      selected = [];
+      dragging = false;
+      svg.classList.remove("is-error", "is-success");
+      liveLine.classList.add("hidden");
+      statusEl.textContent = customHint || defaultHint;
+      renderState();
+      if (onChange) onChange([]);
+    };
+    const setError = (msg = null) => {
+      svg.classList.remove("is-success");
+      svg.classList.add("is-error");
+      if (msg) statusEl.textContent = msg;
+      if (autoClearOnErrorMs > 0) {
+        if (clearTimer) clearTimeout(clearTimer);
+        clearTimer = setTimeout(() => reset(), autoClearOnErrorMs);
+      }
+    };
+    const setSuccess = (msg = null) => {
+      svg.classList.remove("is-error");
+      svg.classList.add("is-success");
+      if (msg) statusEl.textContent = msg;
+    };
+    const svgPointFromEvent = (ev) => {
+      const rect = svg.getBoundingClientRect();
+      if (!rect.width || !rect.height) return { x: -100, y: -100 };
+      return {
+        x: (ev.clientX - rect.left) / rect.width * 300,
+        y: (ev.clientY - rect.top) / rect.height * 300
+      };
+    };
+    const hitTestDot = (pt, radius = 34) => {
+      for (let i = 0; i < 9; i++) {
+        const dx = pt.x - CENTERS[i].x;
+        const dy = pt.y - CENTERS[i].y;
+        if (dx * dx + dy * dy <= radius * radius) return i;
+      }
+      return -1;
+    };
+    const selectDot = (idx) => {
+      if (idx < 0 || selected.includes(idx)) return false;
+      if (selected.length > 0) {
+        const prev = selected[selected.length - 1];
+        const mid = MIDPOINTS.get(`${prev}-${idx}`);
+        if (mid !== void 0 && !selected.includes(mid)) {
+          selected.push(mid);
+        }
+      }
+      selected.push(idx);
+      triggerHaptic(10);
+      renderState();
+      if (onChange) onChange([...selected]);
+      return true;
+    };
+    const updateLiveLine = (pt) => {
+      if (!dragging || selected.length === 0) {
+        liveLine.classList.add("hidden");
+        return;
+      }
+      const last = CENTERS[selected[selected.length - 1]];
+      liveLine.setAttribute("x1", String(last.x));
+      liveLine.setAttribute("y1", String(last.y));
+      liveLine.setAttribute("x2", String(pt.x));
+      liveLine.setAttribute("y2", String(pt.y));
+      liveLine.classList.remove("hidden");
+    };
+    const finishDraw = () => {
+      if (!dragging) return;
+      dragging = false;
+      liveLine.classList.add("hidden");
+      if (selected.length === 0) return;
+      if (selected.length < MIN_PATTERN_DOTS) {
+        setError(
+          lang === "en" ? `Connect at least ${MIN_PATTERN_DOTS} dots` : `\u0648\u0635\u0651\u0644 ${MIN_PATTERN_DOTS} \u0646\u0642\u0627\u0637 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644`
+        );
+        return;
+      }
+      const secret = encodePatternSecret(selected);
+      if (onComplete) onComplete(secret, [...selected]);
+    };
+    svg.addEventListener("pointerdown", (ev) => {
+      if (disabled) return;
+      ev.preventDefault();
+      if (clearTimer) {
+        clearTimeout(clearTimer);
+        clearTimer = null;
+      }
+      selected = [];
+      svg.classList.remove("is-error", "is-success");
+      dragging = true;
+      try {
+        svg.setPointerCapture(ev.pointerId);
+      } catch {
+      }
+      const pt = svgPointFromEvent(ev);
+      const hit = hitTestDot(pt, 38);
+      if (hit !== -1) {
+        selectDot(hit);
+        updateLiveLine(pt);
+      } else {
+        renderState();
+      }
+    });
+    svg.addEventListener("pointermove", (ev) => {
+      if (!dragging || disabled) return;
+      ev.preventDefault();
+      const pt = svgPointFromEvent(ev);
+      const hit = hitTestDot(pt, 34);
+      if (hit !== -1) selectDot(hit);
+      updateLiveLine(pt);
+    });
+    svg.addEventListener("pointerup", (ev) => {
+      if (!dragging) return;
+      ev.preventDefault();
+      finishDraw();
+    });
+    svg.addEventListener("pointercancel", () => {
+      finishDraw();
+    });
+    const clearBtn = el(
+      "button",
+      {
+        type: "button",
+        class: "btn btn-sm btn-ghost",
+        onClick: () => reset()
+      },
+      lang === "en" ? "Clear Pattern" : "\u0625\u0639\u0627\u062F\u0629 \u0627\u0644\u0631\u0633\u0645"
+    );
+    const wrap = el(
+      "div",
+      { class: "pattern-pad-wrap" },
+      statusEl,
+      svg,
+      clearBtn
+    );
+    return {
+      wrap,
+      reset,
+      setError,
+      setSuccess,
+      getDots: () => [...selected],
+      getSecret: () => selected.length >= MIN_PATTERN_DOTS ? encodePatternSecret(selected) : null,
+      setDisabled: (val) => {
+        disabled = Boolean(val);
+        svg.classList.toggle("is-disabled", disabled);
+      },
+      setHint: (text) => {
+        statusEl.textContent = text;
+      }
+    };
+  }
+
   // src/ui/dom.js
   var SVG_NS = "http://www.w3.org/2000/svg";
   var ACCENT_MAP = /* @__PURE__ */ new Map([
@@ -5591,41 +6054,6 @@
     modalRoot.appendChild(backdrop);
     return { close, panel };
   }
-  function attachHoldToReveal(button, { onReveal, onHide, autoHideMs = 1e4 }) {
-    let hideTimer = null;
-    let revealed = false;
-    const reveal = () => {
-      if (!revealed) {
-        revealed = true;
-        onReveal();
-      }
-      if (hideTimer) clearTimeout(hideTimer);
-      hideTimer = setTimeout(hide, autoHideMs);
-    };
-    const hide = () => {
-      if (hideTimer) {
-        clearTimeout(hideTimer);
-        hideTimer = null;
-      }
-      if (revealed) {
-        revealed = false;
-        onHide();
-      }
-    };
-    button.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      reveal();
-    });
-    button.addEventListener("pointerup", hide);
-    button.addEventListener("pointercancel", hide);
-    button.addEventListener("pointerleave", hide);
-    button.addEventListener("click", (e) => {
-      if (e.detail === 0) {
-        if (revealed) hide();
-        else reveal();
-      }
-    });
-  }
   function requestReauth({ session: session2, lang }) {
     if (!session2.settings?.reauthSensitive) {
       return Promise.resolve(true);
@@ -5638,15 +6066,9 @@
         sheet.close();
         resolve(ok);
       };
+      let activeMethod = session2.hasPatternUnlock ? "pattern" : "password";
+      const host = el("div", { class: "settings-group" });
       const errBox = el("div", { class: "banner banner-danger hidden", role: "alert" });
-      const pwdInput = el("input", {
-        type: "password",
-        class: "input ltr-value",
-        autocomplete: "off",
-        spellcheck: "false",
-        placeholder: t(lang, "masterPasswordLabel")
-      });
-      const submitBtn = el("button", { type: "submit", class: "btn btn-primary btn-block" }, t(lang, "confirmBtn"));
       const bioState = session2.getBiometricState();
       const bioBtn = bioState.enabled ? el(
         "button",
@@ -5667,33 +6089,102 @@
         svgIcon("fingerprint", 18),
         t(lang, "unlockWithFingerprint")
       ) : null;
-      const form = el(
-        "form",
-        {
-          onSubmit: async (e) => {
-            e.preventDefault();
-            errBox.classList.add("hidden");
-            submitBtn.disabled = true;
-            try {
-              await session2.verifyReauth({ masterPassword: pwdInput.value });
-              pwdInput.value = "";
-              finish(true);
-            } catch (err) {
-              errBox.textContent = formatError(err, lang);
-              errBox.classList.remove("hidden");
-            } finally {
-              submitBtn.disabled = false;
+      const renderContent = () => {
+        clearNode(host);
+        host.appendChild(el("p", { class: "settings-row-desc" }, t(lang, "reauthSubtitle")));
+        host.appendChild(errBox);
+        if (activeMethod === "pattern") {
+          const pad = createPatternPad({
+            lang,
+            hint: t(lang, "patternDrawUnlock"),
+            onComplete: async (secret) => {
+              errBox.classList.add("hidden");
+              pad.setDisabled(true);
+              try {
+                await session2.verifyReauth({ masterPassword: secret });
+                pad.setSuccess();
+                finish(true);
+              } catch (err) {
+                pad.setDisabled(false);
+                pad.setError(formatError(err, lang));
+                errBox.textContent = formatError(err, lang);
+                errBox.classList.remove("hidden");
+              }
             }
+          });
+          host.appendChild(pad.wrap);
+          if (session2.hasPasswordUnlock) {
+            host.appendChild(
+              el(
+                "button",
+                {
+                  type: "button",
+                  class: "btn btn-ghost btn-sm btn-block",
+                  onClick: () => {
+                    activeMethod = "password";
+                    renderContent();
+                  }
+                },
+                t(lang, "usePasswordUnlock")
+              )
+            );
           }
-        },
-        el("p", { class: "settings-row-desc" }, t(lang, "reauthSubtitle")),
-        errBox,
-        el("div", { class: "field" }, pwdInput),
-        el("div", { class: "settings-group" }, submitBtn, bioBtn)
-      );
+        } else {
+          const pwdInput = el("input", {
+            type: "password",
+            class: "input ltr-value",
+            autocomplete: "off",
+            spellcheck: "false",
+            placeholder: t(lang, "masterPasswordLabel")
+          });
+          const submitBtn = el("button", { type: "submit", class: "btn btn-primary btn-block" }, t(lang, "confirmBtn"));
+          const form = el(
+            "form",
+            {
+              onSubmit: async (e) => {
+                e.preventDefault();
+                errBox.classList.add("hidden");
+                submitBtn.disabled = true;
+                try {
+                  await session2.verifyReauth({ masterPassword: pwdInput.value });
+                  pwdInput.value = "";
+                  finish(true);
+                } catch (err) {
+                  errBox.textContent = formatError(err, lang);
+                  errBox.classList.remove("hidden");
+                } finally {
+                  submitBtn.disabled = false;
+                }
+              }
+            },
+            el("div", { class: "field" }, pwdInput),
+            submitBtn
+          );
+          host.appendChild(form);
+          if (session2.hasPatternUnlock) {
+            host.appendChild(
+              el(
+                "button",
+                {
+                  type: "button",
+                  class: "btn btn-ghost btn-sm btn-block",
+                  onClick: () => {
+                    activeMethod = "pattern";
+                    renderContent();
+                  }
+                },
+                t(lang, "usePatternUnlock")
+              )
+            );
+          }
+          setTimeout(() => pwdInput.focus(), 60);
+        }
+        if (bioBtn) host.appendChild(bioBtn);
+      };
+      renderContent();
       const sheet = openBottomSheet({
         title: t(lang, "reauthTitle"),
-        content: form,
+        content: host,
         onClose: () => {
           if (!settled) {
             settled = true;
@@ -5701,7 +6192,6 @@
           }
         }
       });
-      setTimeout(() => pwdInput.focus(), 60);
     });
   }
   function animateCounter(node, target) {
@@ -5844,32 +6334,36 @@
       const partial = Boolean(d.partial || isPartialCardNumber(d.number));
       const widget = build3DBankCardWidget({ data: d, lang, masked: true, isPreview: false });
       let reauthedCvv = false;
+      widget.scene.classList.add("is-clickable");
+      widget.scene.addEventListener("click", () => {
+        triggerHaptic(10);
+        widget.toggleFlip();
+      });
       const flipBtn = el(
         "button",
         {
           type: "button",
-          class: "btn btn-sm",
+          class: "btn btn-icon-sm btn-ghost",
           "aria-label": `${t(lang, "flipCard")} ${d.cardName}`,
+          title: t(lang, "flipCard"),
           onClick: () => {
             triggerHaptic(10);
             widget.toggleFlip();
           }
         },
-        svgIcon("flip", 15),
-        t(lang, "flipCard")
+        svgIcon("flip", 16)
       );
-      const holdNumBtn = el(
+      const copyNumBtn = d.number ? el(
         "button",
-        { type: "button", class: "btn btn-sm", title: t(lang, "holdToReveal") },
-        svgIcon("eye", 15),
-        t(lang, "cardNumberLabel")
-      );
-      attachHoldToReveal(holdNumBtn, {
-        onReveal: () => widget.setNumberText(formatCardNumber(d.number, brand)),
-        onHide: () => widget.setNumberText(maskCardNumber(d.number, brand)),
-        autoHideMs: 1e4
-      });
-      const revealCvvBtn = el(
+        {
+          type: "button",
+          class: "btn btn-sm btn-primary card-simple-copy",
+          onClick: () => copySecret(normalizeCardInput(d.number), t(lang, "cardNumberLabel"))
+        },
+        svgIcon("copy", 14),
+        t(lang, "copyNumberShort")
+      ) : null;
+      const cvvBtn = d.cvv || d.pin ? el(
         "button",
         {
           type: "button",
@@ -5883,6 +6377,9 @@
             widget.setFlipped(true);
             widget.setCvvText(d.cvv || "\u2014");
             widget.setPinText(d.pin || "\u2014");
+            if (d.cvv) {
+              await copySecret(d.cvv, "CVV");
+            }
             setTimeout(() => {
               widget.setCvvText("\u2022\u2022\u2022");
               widget.setPinText("\u2022\u2022\u2022\u2022");
@@ -5890,88 +6387,31 @@
             }, 1e4);
           }
         },
-        svgIcon("eye", 15),
-        "CVV / PIN"
-      );
-      const copyActions = el(
-        "div",
-        { class: "entry-actions-row" },
-        d.number ? el("button", { type: "button", class: "btn btn-sm", onClick: () => copySecret(normalizeCardInput(d.number), t(lang, "cardNumberLabel")) }, svgIcon("copy", 14), t(lang, "cardNumberLabel")) : null,
-        d.holderName ? el("button", { type: "button", class: "btn btn-sm", onClick: () => copySecret(d.holderName, t(lang, "holderNameLabel")) }, svgIcon("copy", 14), t(lang, "holderNameLabel")) : null,
-        d.expiry ? el("button", { type: "button", class: "btn btn-sm", onClick: () => copySecret(d.expiry, t(lang, "expiryLabel")) }, svgIcon("copy", 14), d.expiry) : null,
-        d.cvv ? el("button", {
+        svgIcon("eye", 14),
+        "CVV"
+      ) : null;
+      const editBtn = el(
+        "button",
+        {
           type: "button",
-          class: "btn btn-sm",
-          onClick: async () => {
-            const ok = await requestReauth({ session: session2, lang });
-            if (!ok) return;
-            await copySecret(d.cvv, "CVV");
-          }
-        }, svgIcon("copy", 14), "CVV") : null,
-        d.pin ? el("button", {
-          type: "button",
-          class: "btn btn-sm",
-          onClick: async () => {
-            const ok = await requestReauth({ session: session2, lang });
-            if (!ok) return;
-            await copySecret(d.pin, "PIN");
-          }
-        }, svgIcon("copy", 14), "PIN") : null,
-        el(
-          "button",
-          {
-            type: "button",
-            class: "btn btn-sm btn-primary",
-            onClick: async () => {
-              if (d.cvv || d.pin) {
-                const ok = await requestReauth({ session: session2, lang });
-                if (!ok) return;
-              }
-              await copySecret(formatCardCopyAll(d, lang), t(lang, "copyAll"));
-            }
-          },
-          svgIcon("copy", 14),
-          t(lang, "copyAll")
-        )
+          class: "btn btn-icon-sm btn-ghost",
+          "aria-label": `${t(lang, "edit")} ${d.cardName}`,
+          title: t(lang, "edit"),
+          onClick: () => openCardEditorSheet({ session: session2, lang, card, onSaved: onRefresh })
+        },
+        svgIcon("edit", 16)
       );
       const wrapper = el(
         "article",
-        { class: "glass-card glass-card-compact bank-card-wrapper stagger-item" },
+        { class: "glass-card glass-card-compact bank-card-wrapper bank-card-simple stagger-item" },
         widget.scene,
         partial ? el("div", { class: "banner banner-warn" }, el("span", null, t(lang, "partialCardBadge"))) : null,
         el(
           "div",
-          { class: "entry-actions-row" },
-          flipBtn,
-          holdNumBtn,
-          d.cvv || d.pin ? revealCvvBtn : null,
-          el(
-            "button",
-            {
-              type: "button",
-              class: "btn btn-sm",
-              "aria-label": `${t(lang, "edit")} ${d.cardName}`,
-              onClick: () => openCardEditorSheet({ session: session2, lang, card, onSaved: onRefresh })
-            },
-            svgIcon("edit", 14),
-            t(lang, "edit")
-          ),
-          el(
-            "button",
-            {
-              type: "button",
-              class: "btn btn-sm btn-danger",
-              "aria-label": `${t(lang, "delete")} ${d.cardName}`,
-              onClick: async () => {
-                await session2.trashRecord(card.id);
-                showToast(t(lang, "delete"), "info");
-                await onRefresh();
-              }
-            },
-            svgIcon("trash", 14)
-          )
-        ),
-        copyActions
+          { class: "card-simple-bar" },
+          el("div", { class: "card-simple-primary" }, copyNumBtn, cvvBtn),
+          el("div", { class: "card-simple-icons" }, flipBtn, editBtn)
+        )
       );
       grid.appendChild(wrapper);
     }
@@ -6196,7 +6636,44 @@
         { class: "form-grid-2" },
         el("button", { type: "button", class: "btn", onClick: () => sheet.close() }, t(lang, "cancel")),
         el("button", { type: "submit", class: "btn btn-primary" }, t(lang, "save"))
-      )
+      ),
+      card ? el(
+        "div",
+        { class: "form-grid-2" },
+        el(
+          "button",
+          {
+            type: "button",
+            class: "btn",
+            onClick: async () => {
+              if (state.cvv || state.pin) {
+                const ok = await requestReauth({ session: session2, lang });
+                if (!ok) return;
+              }
+              await session2.clipboard.copySecret(formatCardCopyAll(state, lang), session2.settings?.clipboardClearSec ?? 30);
+              triggerHaptic();
+              showToast(`${t(lang, "copiedToast")}: ${t(lang, "copyAll")}`, "success");
+            }
+          },
+          svgIcon("copy", 15),
+          t(lang, "copyAll")
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            class: "btn btn-danger",
+            onClick: async () => {
+              await session2.trashRecord(card.id);
+              sheet.close();
+              showToast(t(lang, "delete"), "info");
+              onSaved && await onSaved();
+            }
+          },
+          svgIcon("trash", 15),
+          t(lang, "delete")
+        )
+      ) : null
     );
     const sheet = openBottomSheet({
       title: card ? t(lang, "editCard") : t(lang, "addCard"),
@@ -8721,8 +9198,9 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       "button",
       {
         type: "button",
-        class: "btn btn-icon btn-ghost",
+        class: `btn btn-icon-sm btn-ghost ${d.favorite ? "is-fav" : ""}`.trim(),
         "aria-label": `${t(lang, "favorites")} ${d.title}`,
+        title: t(lang, "favorites"),
         onClick: async () => {
           await session2.saveRecord({
             id: entry.id,
@@ -8733,11 +9211,41 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
           await onRefresh();
         }
       },
-      svgIcon("star", 18, Boolean(d.favorite))
+      svgIcon("star", 16, Boolean(d.favorite))
+    );
+    const moveIconBtn = el(
+      "button",
+      {
+        type: "button",
+        class: "btn btn-icon-sm btn-ghost",
+        "aria-label": `${t(lang, "moveToSection")} ${d.title}`,
+        title: t(lang, "moveToSection"),
+        onClick: () => {
+          openMoveEntrySheet({ session: session2, lang, entry, sections: sortedSections, onRefresh });
+        }
+      },
+      svgIcon("link", 15)
+    );
+    const editIconBtn = el(
+      "button",
+      {
+        type: "button",
+        class: "btn btn-icon-sm btn-ghost",
+        "aria-label": `${t(lang, "edit")} ${d.title}`,
+        title: t(lang, "edit"),
+        onClick: () => openPasswordEditorSheet({
+          session: session2,
+          lang,
+          sections: sortedSections,
+          entry,
+          onSaved: onRefresh
+        })
+      },
+      svgIcon("edit", 15)
     );
     const topRow = el(
       "div",
-      { class: "entry-top" },
+      { class: "entry-top entry-top-simple" },
       el(
         "div",
         { class: "entry-title-group" },
@@ -8747,132 +9255,11 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
           el("span", null, sec?.data?.emoji || "\u{1F510}"),
           el("span", null, d.title || "Untitled")
         ),
-        d.url ? el("p", { class: "entry-sub ltr-value" }, d.url) : null
+        d.username ? el("p", { class: "entry-sub ltr-value" }, d.username) : null
       ),
-      !state.showTrash ? favBtn : null
+      !state.showTrash ? el("div", { class: "entry-mini-icons" }, favBtn, moveIconBtn, editIconBtn) : null
     );
-    const fieldsBox = el("div", { class: "entry-fields" });
-    if (d.username) {
-      fieldsBox.appendChild(
-        el(
-          "div",
-          { class: "secret-field-row" },
-          el(
-            "div",
-            { class: "secret-field-meta" },
-            el("span", { class: "secret-field-label" }, t(lang, "usernameLabel")),
-            el("span", { class: "secret-field-val ltr-value" }, d.username)
-          ),
-          el(
-            "button",
-            {
-              type: "button",
-              class: "btn btn-sm",
-              "aria-label": `${t(lang, "copyUser")} ${d.title}`,
-              onClick: () => copyField(d.username, t(lang, "usernameLabel"))
-            },
-            svgIcon("copy", 15),
-            t(lang, "copyUser")
-          )
-        )
-      );
-    }
-    if (d.password) {
-      const maskedText = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
-      const pwdSpan = el("span", { class: "secret-field-val ltr-value" }, maskedText);
-      const revealBtn = el(
-        "button",
-        {
-          type: "button",
-          class: "btn btn-icon btn-sm",
-          "aria-label": `${t(lang, "holdToReveal")} ${d.title}`,
-          title: t(lang, "holdToReveal")
-        },
-        svgIcon("eye", 16)
-      );
-      attachHoldToReveal(revealBtn, {
-        onReveal: () => {
-          pwdSpan.textContent = d.password;
-        },
-        onHide: () => {
-          pwdSpan.textContent = maskedText;
-        },
-        autoHideMs: 1e4
-      });
-      fieldsBox.appendChild(
-        el(
-          "div",
-          { class: "secret-field-row" },
-          el(
-            "div",
-            { class: "secret-field-meta" },
-            el("span", { class: "secret-field-label" }, t(lang, "passwordLabel")),
-            pwdSpan
-          ),
-          revealBtn,
-          el(
-            "button",
-            {
-              type: "button",
-              class: "btn btn-sm",
-              "aria-label": `${t(lang, "copyPass")} ${d.title}`,
-              onClick: () => copyField(d.password, t(lang, "passwordLabel"))
-            },
-            svgIcon("copy", 15),
-            t(lang, "copyPass")
-          )
-        )
-      );
-    }
-    if (d.url) {
-      fieldsBox.appendChild(
-        el(
-          "div",
-          { class: "secret-field-row" },
-          el(
-            "div",
-            { class: "secret-field-meta" },
-            el("span", { class: "secret-field-label" }, t(lang, "urlLabel")),
-            el("span", { class: "secret-field-val ltr-value" }, d.url)
-          ),
-          el(
-            "button",
-            {
-              type: "button",
-              class: "btn btn-sm",
-              "aria-label": `${t(lang, "copyUrl")} ${d.title}`,
-              onClick: () => copyField(d.url, t(lang, "urlLabel"))
-            },
-            svgIcon("copy", 15)
-          )
-        )
-      );
-    }
-    if (d.notes) {
-      fieldsBox.appendChild(
-        el(
-          "div",
-          { class: "secret-field-row" },
-          el(
-            "div",
-            { class: "secret-field-meta" },
-            el("span", { class: "secret-field-label" }, t(lang, "notesLabel")),
-            el("span", { class: "secret-field-val" }, d.notes)
-          ),
-          el(
-            "button",
-            {
-              type: "button",
-              class: "btn btn-sm",
-              "aria-label": `${t(lang, "copyNotes")} ${d.title}`,
-              onClick: () => copyField(d.notes, t(lang, "notesLabel"))
-            },
-            svgIcon("copy", 15)
-          )
-        )
-      );
-    }
-    const actionsRow = el("div", { class: "entry-actions-row" });
+    const actionsRow = el("div", { class: "entry-copy-row" });
     if (state.showTrash) {
       actionsRow.appendChild(
         el(
@@ -8903,89 +9290,42 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
         )
       );
     } else {
-      if (d.username && d.password) {
+      if (d.username) {
         actionsRow.appendChild(
           el(
             "button",
             {
               type: "button",
-              class: "btn btn-sm btn-dual-copy",
-              "aria-label": `${t(lang, "copyBothNow")} ${d.title}`,
-              title: t(lang, "copyBothNow"),
-              onClick: async () => {
-                try {
-                  const clearSec = session2.settings?.clipboardClearSec ?? 30;
-                  const combined = `${d.username}
-${d.password}`;
-                  await session2.clipboard.copySecret(combined, clearSec);
-                  triggerHaptic();
-                  showToast(t(lang, "copiedUserAndPass"), "success");
-                } catch (err) {
-                  showToast(formatError(err, lang), "error");
-                }
-              }
+              class: "btn btn-sm entry-copy-btn",
+              "aria-label": `${t(lang, "copyUser")} ${d.title}`,
+              onClick: () => copyField(d.username, t(lang, "usernameLabel"))
             },
-            svgIcon("copy", 15),
-            t(lang, "copyBothNow")
+            svgIcon("copy", 14),
+            t(lang, "copyUser")
           )
         );
       }
-      actionsRow.appendChild(
-        el(
-          "button",
-          {
-            type: "button",
-            class: "btn btn-sm btn-move-sec",
-            "aria-label": `${t(lang, "moveToSection")} ${d.title}`,
-            title: t(lang, "moveToSection"),
-            onClick: () => {
-              openMoveEntrySheet({ session: session2, lang, entry, sections: sortedSections, onRefresh });
-            }
-          },
-          svgIcon("link", 14),
-          t(lang, "moveToSection")
-        )
-      );
-      actionsRow.appendChild(
-        el(
-          "button",
-          {
-            type: "button",
-            class: "btn btn-sm",
-            "aria-label": `${t(lang, "edit")} ${d.title}`,
-            onClick: () => openPasswordEditorSheet({
-              session: session2,
-              lang,
-              sections: sortedSections,
-              entry,
-              onSaved: onRefresh
-            })
-          },
-          svgIcon("edit", 15),
-          t(lang, "edit")
-        )
-      );
-      actionsRow.appendChild(
-        el(
-          "button",
-          {
-            type: "button",
-            class: "btn btn-sm btn-danger",
-            "aria-label": `${t(lang, "delete")} ${d.title}`,
-            onClick: async () => {
-              await session2.trashRecord(entry.id);
-              showToast(t(lang, "moveToTrash"), "info");
-              await onRefresh();
-            }
-          },
-          svgIcon("trash", 15),
-          t(lang, "delete")
-        )
-      );
+      if (d.password) {
+        actionsRow.appendChild(
+          el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-sm btn-dual-copy entry-copy-btn",
+              "aria-label": `${t(lang, "copyPass")} ${d.title}`,
+              onClick: () => copyField(d.password, t(lang, "passwordLabel"))
+            },
+            svgIcon("key", 14),
+            t(lang, "copyPass")
+          )
+        );
+      }
     }
+    card.classList.add("entry-card-simple");
     card.appendChild(topRow);
-    card.appendChild(fieldsBox);
-    card.appendChild(actionsRow);
+    if (actionsRow.childNodes.length > 0) {
+      card.appendChild(actionsRow);
+    }
     return card;
   }
   function openMoveEntrySheet({ session: session2, lang, entry, sections, onRefresh }) {
@@ -9183,7 +9523,22 @@ ${d.password}`;
         { class: "form-grid-2" },
         el("button", { type: "button", class: "btn", onClick: () => sheet.close() }, t(lang, "cancel")),
         el("button", { type: "submit", class: "btn btn-primary" }, t(lang, "save"))
-      )
+      ),
+      entry ? el(
+        "button",
+        {
+          type: "button",
+          class: "btn btn-danger btn-block",
+          onClick: async () => {
+            await session2.trashRecord(entry.id);
+            sheet.close();
+            showToast(t(lang, "moveToTrash"), "info");
+            onSaved && await onSaved();
+          }
+        },
+        svgIcon("trash", 15),
+        t(lang, "delete")
+      ) : null
     );
     const sheet = openBottomSheet({
       title: entry ? t(lang, "editEntry") : t(lang, "addEntry"),
@@ -9481,6 +9836,13 @@ ${d.password}`;
         await session2.updateSettings({ reauthSensitive: e.target.checked });
       }
     });
+    const privacyBlurCheck = el("input", {
+      type: "checkbox",
+      checked: settings.privacyBlurOnBlur === true,
+      onChange: async (e) => {
+        await session2.updateSettings({ privacyBlurOnBlur: e.target.checked });
+      }
+    });
     const wipeSel = el(
       "select",
       {
@@ -9536,6 +9898,7 @@ ${d.password}`;
         el("div", { class: "settings-row" }, el("span", { class: "settings-row-title" }, t(lang, "clipboardClearLabel")), clipSel),
         el("div", { class: "banner banner-info" }, el("span", null, t(lang, "clipboardLimitNote"))),
         el("label", { class: "checkbox-row" }, reauthCheck, el("span", null, t(lang, "reauthLabel"))),
+        !isNativeAndroid ? el("label", { class: "checkbox-row" }, privacyBlurCheck, el("span", null, t(lang, "privacyBlurLabel"))) : null,
         el(
           "div",
           { class: "settings-row" },
@@ -9550,22 +9913,32 @@ ${d.password}`;
             "button",
             {
               type: "button",
-              class: "btn",
-              onClick: () => openChangeMasterPasswordSheet({ session: session2, lang })
+              class: "btn btn-primary",
+              onClick: () => openSetPatternSheet({ session: session2, lang, onDone: onRefresh })
             },
-            svgIcon("key", 16),
-            t(lang, "changeMasterPwd")
+            svgIcon("lock", 16),
+            t(lang, "changePatternBtn")
           ),
           el(
             "button",
             {
               type: "button",
               class: "btn",
-              onClick: () => openRotateRecoverySheet({ session: session2, lang })
+              onClick: () => openChangeMasterPasswordSheet({ session: session2, lang, onDone: onRefresh })
             },
-            svgIcon("refresh", 16),
-            t(lang, "rotateRecoveryKey")
+            svgIcon("key", 16),
+            session2.hasPasswordUnlock ? t(lang, "changeMasterPwd") : t(lang, "addOptionalPasswordBtn")
           )
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            class: "btn btn-block",
+            onClick: () => openRotateRecoverySheet({ session: session2, lang })
+          },
+          svgIcon("refresh", 16),
+          t(lang, "rotateRecoveryKey")
         )
       )
     );
@@ -9693,7 +10066,7 @@ ${d.password}`;
         "div",
         { class: "settings-row" },
         el("span", { class: "settings-row-title" }, t(lang, "appVersionLabel")),
-        el("span", { class: "settings-row-desc ltr-inline mono" }, `v${integrityInfo?.version || "2.2.0"} \u2022 ${kdfInfo}`)
+        el("span", { class: "settings-row-desc ltr-inline mono" }, `v${integrityInfo?.version || "2.3.0"} \u2022 ${kdfInfo}`)
       )
     );
     pwaCard.appendChild(
@@ -9716,8 +10089,6 @@ ${d.password}`;
           )
         )
       );
-    } else {
-      pwaCard.appendChild(el("div", { class: "banner banner-warn" }, el("span", null, t(lang, "screenshotHonesty"))));
     }
     pwaCard.appendChild(
       el(
@@ -9734,163 +10105,296 @@ ${d.password}`;
     container.appendChild(pwaCard);
     return container;
   }
-  function openBiometricSetupSheet({ session: session2, lang, onDone }) {
+  function renderCurrentLockStep({ session: session2, lang, onVerified, submitLabel }) {
+    const wrap = el("div", { class: "settings-group" });
     const errBox = el("div", { class: "banner banner-danger hidden", role: "alert" });
-    const pwdIn = el("input", {
-      type: "password",
-      class: "input ltr-value",
-      autocomplete: "off",
-      spellcheck: "false",
-      required: true,
-      placeholder: t(lang, "masterPasswordLabel")
-    });
-    const body = el("div", { class: "settings-group" });
-    const submitBtn = el("button", { type: "submit", class: "btn btn-primary btn-block" }, svgIcon("fingerprint", 18), t(lang, "enableBiometric"));
-    const form = el(
-      "form",
-      {
-        onSubmit: async (e) => {
-          e.preventDefault();
-          errBox.classList.add("hidden");
-          submitBtn.disabled = true;
-          try {
-            const res = await session2.enrollBiometricWithPassword(pwdIn.value);
-            pwdIn.value = "";
-            if (res.mode === "prf" || res.mode === "native") {
-              sheet.close();
-              showToast(
-                res.mode === "native" ? lang === "en" ? "Native Android Biometric Enabled \u2713" : "\u062A\u0645 \u062A\u0641\u0639\u064A\u0644 \u0628\u0635\u0645\u0629 \u0623\u0646\u062F\u0631\u0648\u064A\u062F \u0628\u0646\u062C\u0627\u062D \u2713" : t(lang, "biometricPrfActive"),
-                "success"
-              );
-              onDone && await onDone();
-            } else if (res.mode === "prf-unavailable") {
-              while (body.firstChild) body.removeChild(body.firstChild);
-              body.appendChild(el("div", { class: "banner banner-warn" }, el("span", null, lang === "en" ? res.warningEn : res.warningAr)));
-              body.appendChild(
-                el(
-                  "div",
-                  { class: "form-grid-2" },
-                  el("button", { type: "button", class: "btn", onClick: () => sheet.close() }, t(lang, "cancel")),
-                  el(
-                    "button",
-                    {
-                      type: "button",
-                      class: "btn btn-primary",
-                      onClick: async () => {
-                        await res._armConvenience();
-                        sheet.close();
-                        showToast(t(lang, "biometricConvActive"), "warn", 4200);
-                        onDone && await onDone();
-                      }
-                    },
-                    lang === "en" ? "Enable Convenience Mode" : "\u062A\u0641\u0639\u064A\u0644 \u0648\u0636\u0639 \u0627\u0644\u0631\u0627\u062D\u0629"
-                  )
-                )
-              );
+    let method = session2.hasPatternUnlock ? "pattern" : "password";
+    const draw = () => {
+      clearNode(wrap);
+      wrap.appendChild(errBox);
+      if (method === "pattern") {
+        const pad = createPatternPad({
+          lang,
+          hint: lang === "en" ? "Draw your current pattern to continue" : "\u0627\u0631\u0633\u0645 \u0627\u0644\u0646\u0645\u0637 \u0627\u0644\u062D\u0627\u0644\u064A \u0644\u0644\u0645\u062A\u0627\u0628\u0639\u0629",
+          onComplete: async (secret) => {
+            errBox.classList.add("hidden");
+            pad.setDisabled(true);
+            try {
+              await onVerified(secret);
+            } catch (err) {
+              pad.setDisabled(false);
+              pad.setError(formatError(err, lang));
+              errBox.textContent = formatError(err, lang);
+              errBox.classList.remove("hidden");
             }
-          } catch (err) {
-            errBox.textContent = formatError(err, lang);
-            errBox.classList.remove("hidden");
-            submitBtn.disabled = false;
+          }
+        });
+        wrap.appendChild(pad.wrap);
+        if (session2.hasPasswordUnlock) {
+          wrap.appendChild(
+            el("button", { type: "button", class: "btn btn-ghost btn-sm btn-block", onClick: () => {
+              method = "password";
+              draw();
+            } }, t(lang, "usePasswordUnlock"))
+          );
+        }
+      } else {
+        const pwdIn = el("input", {
+          type: "password",
+          class: "input ltr-value",
+          autocomplete: "off",
+          spellcheck: "false",
+          required: true,
+          placeholder: t(lang, "masterPasswordLabel")
+        });
+        const submitBtn = el("button", { type: "submit", class: "btn btn-primary btn-block" }, submitLabel || t(lang, "confirmBtn"));
+        const form = el(
+          "form",
+          {
+            onSubmit: async (e) => {
+              e.preventDefault();
+              errBox.classList.add("hidden");
+              submitBtn.disabled = true;
+              try {
+                await onVerified(pwdIn.value);
+                pwdIn.value = "";
+              } catch (err) {
+                errBox.textContent = formatError(err, lang);
+                errBox.classList.remove("hidden");
+                submitBtn.disabled = false;
+              }
+            }
+          },
+          el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "masterPasswordLabel")), pwdIn),
+          submitBtn
+        );
+        wrap.appendChild(form);
+        if (session2.hasPatternUnlock) {
+          wrap.appendChild(
+            el("button", { type: "button", class: "btn btn-ghost btn-sm btn-block", onClick: () => {
+              method = "pattern";
+              draw();
+            } }, t(lang, "usePatternUnlock"))
+          );
+        }
+      }
+    };
+    draw();
+    return wrap;
+  }
+  function openBiometricSetupSheet({ session: session2, lang, onDone }) {
+    const body = el("div", { class: "settings-group" });
+    body.appendChild(
+      renderCurrentLockStep({
+        session: session2,
+        lang,
+        submitLabel: t(lang, "enableBiometric"),
+        onVerified: async (secret) => {
+          const res = await session2.enrollBiometricWithPassword(secret);
+          if (res.mode === "prf" || res.mode === "native") {
+            sheet.close();
+            showToast(
+              res.mode === "native" ? lang === "en" ? "Native Android Biometric Enabled \u2713" : "\u062A\u0645 \u062A\u0641\u0639\u064A\u0644 \u0628\u0635\u0645\u0629 \u0623\u0646\u062F\u0631\u0648\u064A\u062F \u0628\u0646\u062C\u0627\u062D \u2713" : t(lang, "biometricPrfActive"),
+              "success"
+            );
+            onDone && await onDone();
+          } else if (res.mode === "prf-unavailable") {
+            clearNode(body);
+            body.appendChild(el("div", { class: "banner banner-warn" }, el("span", null, lang === "en" ? res.warningEn : res.warningAr)));
+            body.appendChild(
+              el(
+                "div",
+                { class: "form-grid-2" },
+                el("button", { type: "button", class: "btn", onClick: () => sheet.close() }, t(lang, "cancel")),
+                el(
+                  "button",
+                  {
+                    type: "button",
+                    class: "btn btn-primary",
+                    onClick: async () => {
+                      await res._armConvenience();
+                      sheet.close();
+                      showToast(t(lang, "biometricConvActive"), "warn", 4200);
+                      onDone && await onDone();
+                    }
+                  },
+                  lang === "en" ? "Enable Convenience Mode" : "\u062A\u0641\u0639\u064A\u0644 \u0648\u0636\u0639 \u0627\u0644\u0631\u0627\u062D\u0629"
+                )
+              )
+            );
           }
         }
-      },
-      errBox,
-      el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "masterPasswordLabel")), pwdIn),
-      submitBtn
+      })
     );
-    body.appendChild(form);
     const sheet = openBottomSheet({ title: t(lang, "biometricTitle"), content: body });
   }
-  function openChangeMasterPasswordSheet({ session: session2, lang }) {
+  function openSetPatternSheet({ session: session2, lang, onDone }) {
+    const host = el("div", { class: "settings-group" });
     const errBox = el("div", { class: "banner banner-danger hidden", role: "alert" });
-    const curIn = el("input", { type: "password", class: "input ltr-value", autocomplete: "off", required: true });
-    const newIn = el("input", { type: "password", class: "input ltr-value", autocomplete: "off", required: true, minlength: 12 });
-    const confIn = el("input", { type: "password", class: "input ltr-value", autocomplete: "off", required: true });
-    const submitBtn = el("button", { type: "submit", class: "btn btn-primary btn-block" }, t(lang, "save"));
-    const form = el(
-      "form",
-      {
-        onSubmit: async (e) => {
-          e.preventDefault();
+    const showNewPatternStep = (currentSecret) => {
+      clearNode(host);
+      host.appendChild(errBox);
+      let firstSecret = null;
+      const pad = createPatternPad({
+        lang,
+        hint: t(lang, "patternDrawFirst"),
+        onComplete: async (newSecret) => {
           errBox.classList.add("hidden");
-          if (newIn.value !== confIn.value) {
-            errBox.textContent = t(lang, "passwordsMismatch");
+          if (!firstSecret) {
+            firstSecret = newSecret;
+            pad.setSuccess(t(lang, "patternDrawConfirm"));
+            setTimeout(() => pad.reset(t(lang, "patternDrawConfirm")), 350);
+            return;
+          }
+          if (newSecret !== firstSecret) {
+            firstSecret = null;
+            pad.setError(t(lang, "patternMismatch"));
+            errBox.textContent = t(lang, "patternMismatch");
             errBox.classList.remove("hidden");
             return;
           }
-          submitBtn.disabled = true;
+          pad.setDisabled(true);
+          pad.setSuccess(t(lang, "save"));
           try {
-            await session2.changeMasterPassword({
-              currentPassword: curIn.value,
-              newMasterPassword: newIn.value
-            });
-            curIn.value = "";
-            newIn.value = "";
-            confIn.value = "";
+            if (session2.unlockMethod === "pattern") {
+              await session2.changeMasterPassword({
+                currentPassword: currentSecret,
+                newMasterPassword: newSecret
+              });
+            } else {
+              await session2.setSecondaryUnlock({
+                currentSecret,
+                altSecret: newSecret
+              });
+            }
             sheet.close();
-            showToast(t(lang, "changeMasterPwd"), "success");
+            showToast(`${t(lang, "changePatternBtn")} \u2713`, "success");
+            onDone && await onDone();
           } catch (err) {
+            firstSecret = null;
+            pad.setDisabled(false);
+            pad.setError(formatError(err, lang));
             errBox.textContent = formatError(err, lang);
             errBox.classList.remove("hidden");
-            submitBtn.disabled = false;
           }
         }
-      },
-      errBox,
-      el("div", { class: "field" }, el("label", { class: "field-label" }, lang === "en" ? "Current Master Password" : "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629 \u0627\u0644\u062D\u0627\u0644\u064A\u0629"), curIn),
-      el("div", { class: "field" }, el("label", { class: "field-label" }, lang === "en" ? "New Master Password (12+ chars)" : "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629 \u0627\u0644\u062C\u062F\u064A\u062F\u0629 (\u0661\u0662 \u062D\u0631\u0641\u0627\u064B+)"), newIn),
-      el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "confirmPasswordLabel")), confIn),
-      submitBtn
+      });
+      host.appendChild(pad.wrap);
+    };
+    host.appendChild(
+      renderCurrentLockStep({
+        session: session2,
+        lang,
+        submitLabel: t(lang, "confirmBtn"),
+        onVerified: async (secret) => {
+          await session2.verifyReauth({ masterPassword: secret });
+          showNewPatternStep(secret);
+        }
+      })
     );
-    const sheet = openBottomSheet({ title: t(lang, "changeMasterPwd"), content: form });
+    const sheet = openBottomSheet({ title: t(lang, "changePatternBtn"), content: host });
+  }
+  function openChangeMasterPasswordSheet({ session: session2, lang, onDone }) {
+    const host = el("div", { class: "settings-group" });
+    const errBox = el("div", { class: "banner banner-danger hidden", role: "alert" });
+    const showNewPwdForm = (currentSecret) => {
+      clearNode(host);
+      const newIn = el("input", { type: "password", class: "input ltr-value", autocomplete: "off", required: true, minlength: 12 });
+      const confIn = el("input", { type: "password", class: "input ltr-value", autocomplete: "off", required: true });
+      const submitBtn = el("button", { type: "submit", class: "btn btn-primary btn-block" }, t(lang, "save"));
+      const form = el(
+        "form",
+        {
+          onSubmit: async (e) => {
+            e.preventDefault();
+            errBox.classList.add("hidden");
+            if (newIn.value !== confIn.value) {
+              errBox.textContent = t(lang, "passwordsMismatch");
+              errBox.classList.remove("hidden");
+              return;
+            }
+            submitBtn.disabled = true;
+            try {
+              if (session2.unlockMethod === "password") {
+                await session2.changeMasterPassword({
+                  currentPassword: currentSecret,
+                  newMasterPassword: newIn.value
+                });
+              } else {
+                await session2.setSecondaryUnlock({
+                  currentSecret,
+                  altSecret: newIn.value
+                });
+              }
+              newIn.value = "";
+              confIn.value = "";
+              sheet.close();
+              showToast(`${t(lang, "save")} \u2713`, "success");
+              onDone && await onDone();
+            } catch (err) {
+              errBox.textContent = formatError(err, lang);
+              errBox.classList.remove("hidden");
+              submitBtn.disabled = false;
+            }
+          }
+        },
+        errBox,
+        el("div", { class: "field" }, el("label", { class: "field-label" }, lang === "en" ? "New Master Password (12+ chars)" : "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629 \u0627\u0644\u062C\u062F\u064A\u062F\u0629 (\u0661\u0662 \u062D\u0631\u0641\u0627\u064B+)"), newIn),
+        el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "confirmPasswordLabel")), confIn),
+        submitBtn
+      );
+      host.appendChild(form);
+    };
+    host.appendChild(
+      renderCurrentLockStep({
+        session: session2,
+        lang,
+        submitLabel: t(lang, "confirmBtn"),
+        onVerified: async (secret) => {
+          await session2.verifyReauth({ masterPassword: secret });
+          showNewPwdForm(secret);
+        }
+      })
+    );
+    const sheet = openBottomSheet({
+      title: session2.hasPasswordUnlock ? t(lang, "changeMasterPwd") : t(lang, "addOptionalPasswordBtn"),
+      content: host
+    });
   }
   function openRotateRecoverySheet({ session: session2, lang }) {
-    const errBox = el("div", { class: "banner banner-danger hidden", role: "alert" });
-    const pwdIn = el("input", { type: "password", class: "input ltr-value", autocomplete: "off", required: true });
     const host = el("div", { class: "settings-group" });
-    const form = el(
-      "form",
-      {
-        onSubmit: async (e) => {
-          e.preventDefault();
-          errBox.classList.add("hidden");
-          try {
-            const { recoveryKeyFormatted } = await session2.rotateRecoveryKeyWithPassword(pwdIn.value);
-            pwdIn.value = "";
-            while (host.firstChild) host.removeChild(host.firstChild);
-            host.appendChild(el("div", { class: "banner banner-warn" }, el("span", null, t(lang, "recoveryModalWarn"))));
-            host.appendChild(el("div", { class: "recovery-key-display" }, recoveryKeyFormatted));
-            host.appendChild(
-              el(
-                "button",
-                {
-                  type: "button",
-                  class: "btn btn-primary btn-block",
-                  onClick: async () => {
-                    try {
-                      await session2.clipboard.copySecret(recoveryKeyFormatted, 0);
-                      showToast(t(lang, "copiedToast"), "success");
-                    } catch (err) {
-                      showToast(formatError(err, lang), "warn");
-                    }
+    host.appendChild(
+      renderCurrentLockStep({
+        session: session2,
+        lang,
+        submitLabel: t(lang, "rotateRecoveryKey"),
+        onVerified: async (secret) => {
+          const { recoveryKeyFormatted } = await session2.rotateRecoveryKeyWithPassword(secret);
+          clearNode(host);
+          host.appendChild(el("div", { class: "banner banner-warn" }, el("span", null, t(lang, "recoveryModalWarn"))));
+          host.appendChild(el("div", { class: "recovery-key-display" }, recoveryKeyFormatted));
+          host.appendChild(
+            el(
+              "button",
+              {
+                type: "button",
+                class: "btn btn-primary btn-block",
+                onClick: async () => {
+                  try {
+                    await session2.clipboard.copySecret(recoveryKeyFormatted, 0);
+                    showToast(t(lang, "copiedToast"), "success");
+                  } catch (err) {
+                    showToast(formatError(err, lang), "warn");
                   }
-                },
-                svgIcon("copy", 16),
-                t(lang, "copyRecoveryKey")
-              )
-            );
-          } catch (err) {
-            errBox.textContent = formatError(err, lang);
-            errBox.classList.remove("hidden");
-          }
+                }
+              },
+              svgIcon("copy", 16),
+              t(lang, "copyRecoveryKey")
+            )
+          );
         }
-      },
-      errBox,
-      el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "masterPasswordLabel")), pwdIn),
-      el("button", { type: "submit", class: "btn btn-primary btn-block" }, t(lang, "rotateRecoveryKey"))
+      })
     );
-    host.appendChild(form);
     openBottomSheet({ title: t(lang, "rotateRecoveryKey"), content: host });
   }
   function openWipeVaultSheet({ session: session2, lang }) {
@@ -10270,239 +10774,228 @@ ${d.password}`;
       const scopeSel = el(
         "select",
         { class: "select", "aria-label": t(lang, "syncScopeLabel") },
-        el("option", { value: "delta", selected: Boolean(lastSyncAt) }, t(lang, "syncScopeDelta")),
-        el("option", { value: "full", selected: !lastSyncAt }, t(lang, "syncScopeFull"))
+        el("option", { value: "full", selected: true }, t(lang, "syncScopeFull")),
+        el("option", { value: "delta", selected: false }, t(lang, "syncScopeDelta"))
       );
-      const passIn = el("input", {
-        type: "password",
-        class: "input ltr-value",
-        autocomplete: "off",
-        spellcheck: "false",
-        placeholder: t(lang, "syncPassPlaceholder"),
-        "data-testid": "sync-send-pass"
-      });
-      const toggleEye = el(
-        "button",
-        {
-          type: "button",
-          class: "btn btn-icon",
-          "aria-label": t(lang, "holdToReveal"),
-          onClick: () => {
-            passIn.type = passIn.type === "password" ? "text" : "password";
-          }
-        },
-        svgIcon("eye", 18)
-      );
-      const genPassBtn = el(
-        "button",
-        {
-          type: "button",
-          class: "btn btn-sm",
-          onClick: () => {
-            passIn.value = generatePassword({ length: 14, lower: true, upper: true, digits: true, symbols: false, excludeLookalikes: true });
-            passIn.type = "text";
-            triggerHaptic();
-          }
-        },
-        svgIcon("key", 15),
-        t(lang, "syncGenPassBtn")
-      );
-      const createBtn = el(
-        "button",
-        {
-          type: "button",
-          class: "btn btn-primary btn-block",
-          "data-testid": "sync-generate-btn",
-          onClick: async () => {
-            errBox.classList.add("hidden");
-            const scope = scopeSel.value;
-            const payload = selectSyncRecords({
-              sections,
-              passwords,
-              cards,
-              notes,
-              mode: scope,
-              sinceIso: scope === "delta" ? lastSyncAt : null
+      let keyMode = session2.hasPatternUnlock ? "pattern" : "password";
+      const keyHost = el("div", { class: "settings-group" });
+      const segPat = el("button", { type: "button", class: `seg-btn ${keyMode === "pattern" ? "is-active" : ""}`.trim() }, t(lang, "patternTabLabel"));
+      const segPwd = el("button", { type: "button", class: `seg-btn ${keyMode === "password" ? "is-active" : ""}`.trim() }, t(lang, "passwordTabLabel"));
+      const runGenerate = async (secret, onDone) => {
+        errBox.classList.add("hidden");
+        const scope = scopeSel.value;
+        const payload = selectSyncRecords({
+          sections,
+          passwords,
+          cards,
+          notes,
+          mode: scope,
+          sinceIso: scope === "delta" ? lastSyncAt : null
+        });
+        const totalItems = payload.passwords.length + payload.cards.length + payload.notes.length;
+        if (totalItems === 0 && payload.sections.length === 0) {
+          errBox.textContent = t(lang, "syncNothingToSend");
+          errBox.classList.remove("hidden");
+          if (onDone) onDone(false);
+          return;
+        }
+        try {
+          const encoded = await encodeSyncPackage({
+            payload,
+            passphrase: secret
+          });
+          const isWebHost = (window.location.protocol === "https:" || window.location.protocol === "http:") && window.location.origin !== "null" && !window.Capacitor?.isNativePlatform?.();
+          const baseUrl = isWebHost ? `${window.location.origin}${window.location.pathname}` : "";
+          const linkInfo = isWebHost ? buildSyncLink(baseUrl, encoded.token) : { fitsUrl: false, url: "" };
+          await session2.updateSettings({ lastSyncAt: (/* @__PURE__ */ new Date()).toISOString() });
+          clearNode(outWrap);
+          outWrap.classList.remove("hidden");
+          const kb = (encoded.byteLength / 1024).toFixed(1);
+          outWrap.appendChild(
+            el(
+              "div",
+              { class: "banner banner-success" },
+              el(
+                "span",
+                null,
+                `${t(lang, "syncReadySummary")}: ${encoded.counts.passwords} \u{1F511} \u2022 ${encoded.counts.cards} \u{1F4B3} \u2022 ${encoded.counts.notes} \u{1F4DD} (${kb} KB)`
+              )
+            )
+          );
+          const codeArea = el("textarea", {
+            class: "textarea ltr-value mono",
+            readonly: true,
+            rows: 3,
+            value: encoded.code,
+            "data-testid": "sync-output-code"
+          });
+          outWrap.appendChild(
+            el(
+              "div",
+              { class: "field" },
+              el("label", { class: "field-label" }, t(lang, "syncCodeLabel")),
+              codeArea,
+              el(
+                "button",
+                {
+                  type: "button",
+                  class: "btn btn-primary btn-block",
+                  "data-testid": "sync-copy-code",
+                  onClick: async () => {
+                    try {
+                      await session2.clipboard.copySecret(encoded.code, 0);
+                      triggerHaptic();
+                      showToast(t(lang, "syncCodeCopied"), "success");
+                    } catch {
+                      codeArea.select();
+                      showToast(t(lang, "syncCopyManual"), "warn");
+                    }
+                  }
+                },
+                svgIcon("copy", 16),
+                t(lang, "syncCopyCodeBtn")
+              )
+            )
+          );
+          if (isWebHost && linkInfo.fitsUrl) {
+            const linkArea = el("textarea", {
+              class: "textarea ltr-value mono",
+              readonly: true,
+              rows: 2,
+              value: linkInfo.url,
+              "data-testid": "sync-output-link"
             });
-            const totalItems = payload.passwords.length + payload.cards.length + payload.notes.length;
-            if (totalItems === 0 && payload.sections.length === 0) {
-              errBox.textContent = t(lang, "syncNothingToSend");
-              errBox.classList.remove("hidden");
-              return;
-            }
-            createBtn.disabled = true;
-            try {
-              const encoded = await encodeSyncPackage({
-                payload,
-                passphrase: passIn.value
-              });
-              const isWebHost = (window.location.protocol === "https:" || window.location.protocol === "http:") && window.location.origin !== "null" && !window.Capacitor?.isNativePlatform?.();
-              const baseUrl = isWebHost ? `${window.location.origin}${window.location.pathname}` : "";
-              const linkInfo = isWebHost ? buildSyncLink(baseUrl, encoded.token) : { fitsUrl: false, url: "" };
-              await session2.updateSettings({ lastSyncAt: (/* @__PURE__ */ new Date()).toISOString() });
-              clearNode(outWrap);
-              outWrap.classList.remove("hidden");
-              const kb = (encoded.byteLength / 1024).toFixed(1);
-              outWrap.appendChild(
+            outWrap.appendChild(
+              el(
+                "div",
+                { class: "field" },
+                el("label", { class: "field-label" }, t(lang, "syncOneTapLinkLabel")),
+                linkArea,
                 el(
-                  "div",
-                  { class: "banner banner-success" },
-                  el(
-                    "span",
-                    null,
-                    `${t(lang, "syncReadySummary")}: ${encoded.counts.passwords} \u{1F511} \u2022 ${encoded.counts.cards} \u{1F4B3} \u2022 ${encoded.counts.notes} \u{1F4DD} (${kb} KB)`
-                  )
+                  "button",
+                  {
+                    type: "button",
+                    class: "btn btn-sm",
+                    "data-testid": "sync-copy-link",
+                    onClick: async () => {
+                      try {
+                        await session2.clipboard.copySecret(linkInfo.url, 0);
+                        triggerHaptic();
+                        showToast(t(lang, "syncLinkCopied"), "success");
+                      } catch {
+                        linkArea.select();
+                        showToast(t(lang, "syncCopyManual"), "warn");
+                      }
+                    }
+                  },
+                  svgIcon("link", 15),
+                  t(lang, "syncCopyLinkBtn")
                 )
-              );
-              if (isWebHost && linkInfo.fitsUrl) {
-                const linkArea = el("textarea", {
-                  class: "textarea ltr-value mono",
-                  readonly: true,
-                  rows: 3,
-                  value: linkInfo.url,
-                  "data-testid": "sync-output-link"
-                });
-                const shareOrCopyRow = el(
-                  "div",
-                  { class: "form-grid-2" },
-                  el(
-                    "button",
-                    {
-                      type: "button",
-                      class: "btn btn-primary",
-                      "data-testid": "sync-copy-link",
-                      onClick: async () => {
-                        try {
-                          await session2.clipboard.copySecret(linkInfo.url, 0);
-                          triggerHaptic();
-                          showToast(t(lang, "syncLinkCopied"), "success");
-                        } catch {
-                          linkArea.select();
-                          showToast(t(lang, "syncCopyManual"), "warn");
-                        }
-                      }
-                    },
-                    svgIcon("link", 16),
-                    t(lang, "syncCopyLinkBtn")
-                  ),
-                  typeof navigator.share === "function" ? el(
-                    "button",
-                    {
-                      type: "button",
-                      class: "btn",
-                      onClick: async () => {
-                        try {
-                          await navigator.share({
-                            title: t(lang, "appName"),
-                            text: t(lang, "syncShareText"),
-                            url: linkInfo.url
-                          });
-                        } catch {
-                        }
-                      }
-                    },
-                    svgIcon("share", 16),
-                    t(lang, "syncShareLinkBtn")
-                  ) : el(
-                    "button",
-                    {
-                      type: "button",
-                      class: "btn",
-                      "data-testid": "sync-copy-code",
-                      onClick: async () => {
-                        try {
-                          await session2.clipboard.copySecret(encoded.code, 0);
-                          triggerHaptic();
-                          showToast(t(lang, "syncCodeCopied"), "success");
-                        } catch {
-                          showToast(t(lang, "syncCopyManual"), "warn");
-                        }
-                      }
-                    },
-                    svgIcon("copy", 16),
-                    t(lang, "syncCopyCodeBtn")
-                  )
-                );
-                outWrap.appendChild(
-                  el(
-                    "div",
-                    { class: "field" },
-                    el("label", { class: "field-label" }, t(lang, "syncOneTapLinkLabel")),
-                    linkArea
-                  )
-                );
-                outWrap.appendChild(shareOrCopyRow);
-              } else if (isWebHost) {
-                outWrap.appendChild(
-                  el("div", { class: "banner banner-warn" }, el("span", null, t(lang, "syncTooLargeForLink")))
-                );
-              }
-              const codeArea = el("textarea", {
-                class: "textarea ltr-value mono",
-                readonly: true,
-                rows: 2,
-                value: encoded.code,
-                "data-testid": "sync-output-code"
-              });
-              outWrap.appendChild(
-                el(
-                  "div",
-                  { class: "field" },
-                  el("label", { class: "field-label" }, t(lang, "syncCodeLabel")),
-                  codeArea,
-                  el(
-                    "button",
-                    {
-                      type: "button",
-                      class: "btn btn-sm",
-                      onClick: async () => {
-                        try {
-                          await session2.clipboard.copySecret(encoded.code, 0);
-                          triggerHaptic();
-                          showToast(t(lang, "syncCodeCopied"), "success");
-                        } catch {
-                          codeArea.select();
-                          showToast(t(lang, "syncCopyManual"), "warn");
-                        }
-                      }
-                    },
-                    svgIcon("copy", 15),
-                    t(lang, "syncCopyCodeBtn")
-                  )
-                )
-              );
-            } catch (err) {
-              errBox.textContent = formatError(err, lang);
-              errBox.classList.remove("hidden");
-            } finally {
-              createBtn.disabled = false;
-            }
+              )
+            );
           }
-        },
-        svgIcon("link", 17),
-        t(lang, "syncGenerateBtn")
-      );
-      body.appendChild(
-        el("div", { class: "banner banner-info" }, el("span", null, t(lang, "syncSecurityNote")))
-      );
+          if (onDone) onDone(true);
+        } catch (err) {
+          errBox.textContent = formatError(err, lang);
+          errBox.classList.remove("hidden");
+          if (onDone) onDone(false);
+        }
+      };
+      const renderKeyInput = () => {
+        clearNode(keyHost);
+        segPat.classList.toggle("is-active", keyMode === "pattern");
+        segPwd.classList.toggle("is-active", keyMode === "password");
+        if (keyMode === "pattern") {
+          const pad = createPatternPad({
+            lang,
+            hint: lang === "en" ? "Draw your vault pattern to encrypt the transfer code" : "\u0627\u0631\u0633\u0645 \u0646\u0645\u0637 \u062E\u0632\u0646\u062A\u0643 \u0644\u0625\u0646\u0634\u0627\u0621 \u0643\u0648\u062F \u0627\u0644\u0646\u0642\u0644 \u0627\u0644\u0645\u0634\u0641\u0651\u0631 \u0641\u0648\u0631\u0627\u064B",
+            onComplete: async (secret) => {
+              pad.setDisabled(true);
+              pad.setSuccess(lang === "en" ? "Encrypting..." : "\u062C\u0627\u0631\u064D \u0627\u0644\u062A\u0634\u0641\u064A\u0631...");
+              await runGenerate(secret, (ok) => {
+                pad.setDisabled(false);
+                if (ok) pad.setSuccess(t(lang, "syncReadySummary"));
+                else pad.reset();
+              });
+            }
+          });
+          keyHost.appendChild(pad.wrap);
+        } else {
+          const passIn = el("input", {
+            type: "password",
+            class: "input ltr-value",
+            autocomplete: "off",
+            spellcheck: "false",
+            placeholder: t(lang, "syncPassPlaceholder"),
+            "data-testid": "sync-send-pass"
+          });
+          const toggleEye = el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-icon",
+              "aria-label": t(lang, "holdToReveal"),
+              onClick: () => {
+                passIn.type = passIn.type === "password" ? "text" : "password";
+              }
+            },
+            svgIcon("eye", 18)
+          );
+          const genPassBtn = el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-sm",
+              onClick: () => {
+                passIn.value = generatePassword({ length: 14, lower: true, upper: true, digits: true, symbols: false, excludeLookalikes: true });
+                passIn.type = "text";
+                triggerHaptic();
+              }
+            },
+            svgIcon("key", 15),
+            t(lang, "syncGenPassBtn")
+          );
+          const createBtn = el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-primary btn-block",
+              "data-testid": "sync-generate-btn",
+              onClick: async () => {
+                createBtn.disabled = true;
+                await runGenerate(passIn.value, () => {
+                  createBtn.disabled = false;
+                });
+              }
+            },
+            svgIcon("link", 17),
+            t(lang, "syncGenerateBtn")
+          );
+          keyHost.appendChild(
+            el(
+              "div",
+              { class: "field" },
+              el("div", { class: "field-label" }, el("span", null, t(lang, "syncPassLabel")), genPassBtn),
+              el("div", { class: "input-row" }, passIn, toggleEye)
+            )
+          );
+          keyHost.appendChild(createBtn);
+        }
+      };
+      segPat.addEventListener("click", () => {
+        keyMode = "pattern";
+        renderKeyInput();
+      });
+      segPwd.addEventListener("click", () => {
+        keyMode = "password";
+        renderKeyInput();
+      });
+      renderKeyInput();
+      body.appendChild(el("div", { class: "banner banner-info" }, el("span", null, t(lang, "syncLockMethodHint"))));
       body.appendChild(errBox);
-      body.appendChild(
-        el(
-          "div",
-          { class: "field" },
-          el("label", { class: "field-label" }, t(lang, "syncScopeLabel")),
-          scopeSel
-        )
-      );
-      body.appendChild(
-        el(
-          "div",
-          { class: "field" },
-          el("div", { class: "field-label" }, el("span", null, t(lang, "syncPassLabel")), genPassBtn),
-          el("div", { class: "input-row" }, passIn, toggleEye)
-        )
-      );
-      body.appendChild(createBtn);
+      body.appendChild(el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "syncScopeLabel")), scopeSel));
+      body.appendChild(el("div", { class: "segmented" }, segPat, segPwd));
+      body.appendChild(keyHost);
       body.appendChild(outWrap);
     };
     const renderReceive = () => {
@@ -10517,128 +11010,149 @@ ${d.password}`;
         placeholder: t(lang, "syncReceivePlaceholder"),
         "data-testid": "sync-recv-input"
       });
-      const passIn = el("input", {
-        type: "password",
-        class: "input ltr-value",
-        autocomplete: "off",
-        spellcheck: "false",
-        placeholder: t(lang, "syncPassPlaceholder"),
-        "data-testid": "sync-recv-pass"
-      });
       const stratSel = el(
         "select",
         { class: "select", "aria-label": t(lang, "syncStrategyLabel") },
         el("option", { value: "smart", selected: true }, t(lang, "syncStrategySmart")),
         el("option", { value: "add-only" }, t(lang, "syncStrategyAddOnly"))
       );
-      const previewBtn = el(
-        "button",
-        {
-          type: "button",
-          class: "btn btn-primary btn-block",
-          "data-testid": "sync-preview-btn",
-          onClick: async () => {
-            errBox.classList.add("hidden");
-            clearNode(previewWrap);
-            previewWrap.classList.add("hidden");
-            previewBtn.disabled = true;
-            try {
-              const incoming = await decodeSyncPackage({
-                input: codeIn.value,
-                passphrase: passIn.value
+      let keyMode = session2.hasPatternUnlock ? "pattern" : "password";
+      const keyHost = el("div", { class: "settings-group" });
+      const segPat = el("button", { type: "button", class: `seg-btn ${keyMode === "pattern" ? "is-active" : ""}`.trim() }, t(lang, "patternTabLabel"));
+      const segPwd = el("button", { type: "button", class: `seg-btn ${keyMode === "password" ? "is-active" : ""}`.trim() }, t(lang, "passwordTabLabel"));
+      const runPreview = async (secret, onDone) => {
+        errBox.classList.add("hidden");
+        clearNode(previewWrap);
+        previewWrap.classList.add("hidden");
+        try {
+          const incoming = await decodeSyncPackage({
+            input: codeIn.value,
+            passphrase: secret
+          });
+          const plan = planSyncMerge({
+            incoming,
+            localSections: sections,
+            localPasswords: passwords,
+            localCards: cards,
+            localNotes: notes,
+            strategy: stratSel.value
+          });
+          previewWrap.classList.remove("hidden");
+          const s = plan.summary;
+          previewWrap.appendChild(
+            el(
+              "div",
+              { class: "banner banner-info", "data-testid": "sync-diff-summary" },
+              el(
+                "span",
+                null,
+                `${t(lang, "syncPreviewDiff")}: +${s.added} ${t(lang, "syncAddedLabel")} \u2022 ${s.updated} ${t(lang, "syncUpdatedLabel")} \u2022 ${s.unchanged} ${t(lang, "syncUnchangedLabel")}`
+              )
+            )
+          );
+          const applyBtn = el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-primary btn-block",
+              "data-testid": "sync-apply-btn",
+              onClick: async () => {
+                applyBtn.disabled = true;
+                try {
+                  const res = await applySyncMerge({ session: session2, plan });
+                  triggerHaptic();
+                  showToast(
+                    `${t(lang, "syncSuccessToast")} (+${res.summary.added} / \u21BB${res.summary.updated})`,
+                    "success",
+                    4e3
+                  );
+                  sheet.close();
+                  if (onSynced) await onSynced();
+                } catch (err) {
+                  errBox.textContent = formatError(err, lang);
+                  errBox.classList.remove("hidden");
+                  applyBtn.disabled = false;
+                }
+              }
+            },
+            svgIcon("check", 17),
+            t(lang, "syncApplyBtn")
+          );
+          previewWrap.appendChild(applyBtn);
+          if (onDone) onDone(true);
+        } catch (err) {
+          errBox.textContent = formatError(err, lang);
+          errBox.classList.remove("hidden");
+          if (onDone) onDone(false, formatError(err, lang));
+        }
+      };
+      const renderRecvKey = () => {
+        clearNode(keyHost);
+        segPat.classList.toggle("is-active", keyMode === "pattern");
+        segPwd.classList.toggle("is-active", keyMode === "password");
+        if (keyMode === "pattern") {
+          const pad = createPatternPad({
+            lang,
+            hint: lang === "en" ? "Draw the SAME pattern used on the sender device" : "\u0627\u0631\u0633\u0645 \u0646\u0641\u0633 \u0627\u0644\u0646\u0645\u0637 \u0644\u0641\u0643 \u062A\u0634\u0641\u064A\u0631 \u0648\u0645\u0639\u0627\u064A\u0646\u0629 \u0627\u0644\u0643\u0648\u062F",
+            onComplete: async (secret) => {
+              pad.setDisabled(true);
+              pad.setSuccess(t(lang, "unlocking"));
+              await runPreview(secret, (ok, msg) => {
+                pad.setDisabled(false);
+                if (ok) pad.setSuccess(t(lang, "syncPreviewDiff"));
+                else pad.setError(msg);
               });
-              const plan = planSyncMerge({
-                incoming,
-                localSections: sections,
-                localPasswords: passwords,
-                localCards: cards,
-                localNotes: notes,
-                strategy: stratSel.value
-              });
-              previewWrap.classList.remove("hidden");
-              const s = plan.summary;
-              previewWrap.appendChild(
-                el(
-                  "div",
-                  { class: "banner banner-info", "data-testid": "sync-diff-summary" },
-                  el(
-                    "span",
-                    null,
-                    `${t(lang, "syncPreviewDiff")}: +${s.added} ${t(lang, "syncAddedLabel")} \u2022 ${s.updated} ${t(lang, "syncUpdatedLabel")} \u2022 ${s.unchanged} ${t(lang, "syncUnchangedLabel")}`
-                  )
-                )
-              );
-              const applyBtn = el(
-                "button",
-                {
-                  type: "button",
-                  class: "btn btn-primary btn-block",
-                  "data-testid": "sync-apply-btn",
-                  onClick: async () => {
-                    applyBtn.disabled = true;
-                    try {
-                      const res = await applySyncMerge({ session: session2, plan });
-                      triggerHaptic();
-                      showToast(
-                        `${t(lang, "syncSuccessToast")} (+${res.summary.added} / \u21BB${res.summary.updated})`,
-                        "success",
-                        4e3
-                      );
-                      sheet.close();
-                      if (onSynced) await onSynced();
-                    } catch (err) {
-                      errBox.textContent = formatError(err, lang);
-                      errBox.classList.remove("hidden");
-                      applyBtn.disabled = false;
-                    }
-                  }
-                },
-                svgIcon("check", 17),
-                t(lang, "syncApplyBtn")
-              );
-              previewWrap.appendChild(applyBtn);
-            } catch (err) {
-              errBox.textContent = formatError(err, lang);
-              errBox.classList.remove("hidden");
-            } finally {
-              previewBtn.disabled = false;
             }
-          }
-        },
-        svgIcon("refresh", 17),
-        t(lang, "syncPreviewBtn")
-      );
+          });
+          keyHost.appendChild(pad.wrap);
+        } else {
+          const passIn = el("input", {
+            type: "password",
+            class: "input ltr-value",
+            autocomplete: "off",
+            spellcheck: "false",
+            placeholder: t(lang, "syncPassPlaceholder"),
+            "data-testid": "sync-recv-pass"
+          });
+          const previewBtn = el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-primary btn-block",
+              "data-testid": "sync-preview-btn",
+              onClick: async () => {
+                previewBtn.disabled = true;
+                await runPreview(passIn.value, () => {
+                  previewBtn.disabled = false;
+                });
+              }
+            },
+            svgIcon("refresh", 17),
+            t(lang, "syncPreviewBtn")
+          );
+          keyHost.appendChild(el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "syncPassLabel")), passIn));
+          keyHost.appendChild(previewBtn);
+        }
+      };
+      segPat.addEventListener("click", () => {
+        keyMode = "pattern";
+        renderRecvKey();
+      });
+      segPwd.addEventListener("click", () => {
+        keyMode = "password";
+        renderRecvKey();
+      });
+      renderRecvKey();
       if (initialSyncCode) {
         body.appendChild(
           el("div", { class: "banner banner-success" }, el("span", null, t(lang, "syncAutofilledBanner")))
         );
       }
       body.appendChild(errBox);
-      body.appendChild(
-        el(
-          "div",
-          { class: "field" },
-          el("label", { class: "field-label" }, t(lang, "syncReceiveCodeLabel")),
-          codeIn
-        )
-      );
-      body.appendChild(
-        el(
-          "div",
-          { class: "field" },
-          el("label", { class: "field-label" }, t(lang, "syncPassLabel")),
-          passIn
-        )
-      );
-      body.appendChild(
-        el(
-          "div",
-          { class: "field" },
-          el("label", { class: "field-label" }, t(lang, "syncStrategyLabel")),
-          stratSel
-        )
-      );
-      body.appendChild(previewBtn);
+      body.appendChild(el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "syncReceiveCodeLabel")), codeIn));
+      body.appendChild(el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "syncStrategyLabel")), stratSel));
+      body.appendChild(el("div", { class: "segmented" }, segPat, segPwd));
+      body.appendChild(keyHost);
       body.appendChild(previewWrap);
     };
     const renderBody = () => {
@@ -10691,6 +11205,7 @@ ${d.password}`;
     onToggleLang,
     onDownloadZip = null,
     hasPendingSync = false,
+    pendingSyncCode = "",
     pendingRecoveryKey = null,
     onRecoveryConfirmed = null
   }) {
@@ -10788,113 +11303,298 @@ ${d.password}`;
       return screen;
     }
     if (!session2.hasVault) {
-      const errBox = el("div", { class: "banner banner-danger hidden", role: "alert" });
-      const pwdInput = el("input", {
-        id: "create-master-pwd",
-        type: "password",
-        class: "input ltr-value",
-        autocomplete: "off",
-        spellcheck: "false",
-        minlength: MIN_MASTER_PASSWORD_LEN,
-        required: true
-      });
-      const confirmInput = el("input", {
-        id: "confirm-master-pwd",
-        type: "password",
-        class: "input ltr-value",
-        autocomplete: "off",
-        spellcheck: "false",
-        required: true
-      });
-      const meter = createStrengthMeter(lang);
-      pwdInput.addEventListener("input", () => meter.update(pwdInput.value));
-      const toggleEye = el(
-        "button",
-        {
-          type: "button",
-          class: "btn btn-icon",
-          "aria-label": t(lang, "holdToReveal"),
-          onClick: () => {
-            const next = pwdInput.type === "password" ? "text" : "password";
-            pwdInput.type = next;
-            confirmInput.type = next;
-          }
-        },
-        svgIcon("eye", 18)
-      );
-      const submitBtn = el("button", { type: "submit", class: "btn btn-primary btn-block" }, t(lang, "createVaultBtn"));
-      const form = el(
-        "form",
-        {
-          onSubmit: async (e) => {
-            e.preventDefault();
+      let createMode = hasPendingSync ? "transfer" : "pattern";
+      const card2 = el("section", { class: "glass-card auth-card" });
+      const renderCreateCard = () => {
+        clearNode(card2);
+        const errBox = el("div", { class: "banner banner-danger hidden", role: "alert" });
+        const tabPattern = el(
+          "button",
+          {
+            type: "button",
+            class: `seg-btn ${createMode === "pattern" ? "is-active" : ""}`.trim(),
+            onClick: () => {
+              createMode = "pattern";
+              renderCreateCard();
+            }
+          },
+          t(lang, "patternTabLabel")
+        );
+        const tabPassword = el(
+          "button",
+          {
+            type: "button",
+            class: `seg-btn ${createMode === "password" ? "is-active" : ""}`.trim(),
+            onClick: () => {
+              createMode = "password";
+              renderCreateCard();
+            }
+          },
+          t(lang, "passwordTabLabel")
+        );
+        card2.appendChild(topTools);
+        card2.appendChild(
+          el(
+            "div",
+            { class: "auth-hero" },
+            el("div", { class: "auth-hero-icon" }, svgIcon(createMode === "transfer" ? "link" : "shield", 32)),
+            el("h1", null, createMode === "transfer" ? t(lang, "transferFromOldTitle") : t(lang, "createVaultTitle")),
+            el("p", null, createMode === "transfer" ? t(lang, "transferFromOldSub") : t(lang, "createVaultSubtitle"))
+          )
+        );
+        if (createMode !== "transfer") {
+          card2.appendChild(el("div", { class: "segmented" }, tabPattern, tabPassword));
+        }
+        card2.appendChild(errBox);
+        if (createMode === "pattern") {
+          let firstSecret = null;
+          const pad = createPatternPad({
+            lang,
+            hint: t(lang, "patternDrawFirst"),
+            onComplete: async (secret) => {
+              errBox.classList.add("hidden");
+              if (!firstSecret) {
+                firstSecret = secret;
+                pad.setSuccess(t(lang, "patternDrawConfirm"));
+                setTimeout(() => pad.reset(t(lang, "patternDrawConfirm")), 350);
+                return;
+              }
+              if (secret !== firstSecret) {
+                firstSecret = null;
+                pad.setError(t(lang, "patternMismatch"));
+                errBox.textContent = t(lang, "patternMismatch");
+                errBox.classList.remove("hidden");
+                return;
+              }
+              pad.setDisabled(true);
+              pad.setSuccess(t(lang, "calibratingKdf"));
+              try {
+                const res = await session2.createVault({ masterPassword: secret });
+                onRecoveryConfirmed && onRecoveryConfirmed(res.recoveryKeyFormatted);
+              } catch (err) {
+                firstSecret = null;
+                pad.setDisabled(false);
+                pad.setError(formatError(err, lang));
+                errBox.textContent = formatError(err, lang);
+                errBox.classList.remove("hidden");
+              }
+            }
+          });
+          card2.appendChild(pad.wrap);
+        } else if (createMode === "password") {
+          const pwdInput = el("input", {
+            id: "create-master-pwd",
+            type: "password",
+            class: "input ltr-value",
+            autocomplete: "off",
+            spellcheck: "false",
+            minlength: MIN_MASTER_PASSWORD_LEN,
+            required: true
+          });
+          const confirmInput = el("input", {
+            id: "confirm-master-pwd",
+            type: "password",
+            class: "input ltr-value",
+            autocomplete: "off",
+            spellcheck: "false",
+            required: true
+          });
+          const meter = createStrengthMeter(lang);
+          pwdInput.addEventListener("input", () => meter.update(pwdInput.value));
+          const toggleEye = el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-icon",
+              "aria-label": t(lang, "holdToReveal"),
+              onClick: () => {
+                const next = pwdInput.type === "password" ? "text" : "password";
+                pwdInput.type = next;
+                confirmInput.type = next;
+              }
+            },
+            svgIcon("eye", 18)
+          );
+          const submitBtn = el("button", { type: "submit", class: "btn btn-primary btn-block" }, t(lang, "createVaultBtn"));
+          const form = el(
+            "form",
+            {
+              onSubmit: async (e) => {
+                e.preventDefault();
+                errBox.classList.add("hidden");
+                const pwd = pwdInput.value;
+                const conf = confirmInput.value;
+                if (Array.from(pwd).length < MIN_MASTER_PASSWORD_LEN) {
+                  errBox.textContent = lang === "en" ? `Master password must be at least ${MIN_MASTER_PASSWORD_LEN} characters.` : `\u064A\u062C\u0628 \u0623\u0644\u0627 \u062A\u0642\u0644 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629 \u0639\u0646 ${MIN_MASTER_PASSWORD_LEN} \u062D\u0631\u0641\u0627\u064B.`;
+                  errBox.classList.remove("hidden");
+                  return;
+                }
+                if (pwd !== conf) {
+                  errBox.textContent = t(lang, "passwordsMismatch");
+                  errBox.classList.remove("hidden");
+                  return;
+                }
+                submitBtn.disabled = true;
+                submitBtn.textContent = t(lang, "calibratingKdf");
+                try {
+                  const res = await session2.createVault({ masterPassword: pwd });
+                  pwdInput.value = "";
+                  confirmInput.value = "";
+                  onRecoveryConfirmed && onRecoveryConfirmed(res.recoveryKeyFormatted);
+                } catch (err) {
+                  errBox.textContent = formatError(err, lang);
+                  errBox.classList.remove("hidden");
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = t(lang, "createVaultBtn");
+                }
+              }
+            },
+            el(
+              "div",
+              { class: "field" },
+              el("label", { class: "field-label", for: "create-master-pwd" }, t(lang, "masterPasswordLabel")),
+              el("div", { class: "input-row" }, pwdInput, toggleEye),
+              meter.wrap
+            ),
+            el(
+              "div",
+              { class: "field" },
+              el("label", { class: "field-label", for: "confirm-master-pwd" }, t(lang, "confirmPasswordLabel")),
+              confirmInput
+            ),
+            el("div", { class: "banner banner-info" }, el("span", null, t(lang, "noHintNote"))),
+            el("div", { class: "field" }),
+            submitBtn
+          );
+          card2.appendChild(form);
+        } else {
+          let transferLockMode = "pattern";
+          const codeIn = el("textarea", {
+            class: "textarea ltr-value mono",
+            rows: 3,
+            autocomplete: "off",
+            spellcheck: "false",
+            value: pendingSyncCode || "",
+            placeholder: t(lang, "syncReceivePlaceholder")
+          });
+          const lockHost = el("div", { class: "settings-group" });
+          const segPat = el("button", { type: "button", class: "seg-btn is-active" }, t(lang, "patternTabLabel"));
+          const segPwd = el("button", { type: "button", class: "seg-btn" }, t(lang, "passwordTabLabel"));
+          const runTransfer = async (secret, onFail) => {
             errBox.classList.add("hidden");
-            const pwd = pwdInput.value;
-            const conf = confirmInput.value;
-            if (Array.from(pwd).length < MIN_MASTER_PASSWORD_LEN) {
-              errBox.textContent = lang === "en" ? `Master password must be at least ${MIN_MASTER_PASSWORD_LEN} characters.` : `\u064A\u062C\u0628 \u0623\u0644\u0627 \u062A\u0642\u0644 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629 \u0639\u0646 ${MIN_MASTER_PASSWORD_LEN} \u062D\u0631\u0641\u0627\u064B.`;
+            const code = codeIn.value.trim();
+            if (!code) {
+              const msg = lang === "en" ? "Paste the transfer code from your old device first." : "\u0627\u0644\u0635\u0642 \u0643\u0648\u062F \u0627\u0644\u0646\u0642\u0644 \u0645\u0646 \u062C\u0647\u0627\u0632\u0643 \u0627\u0644\u0642\u062F\u064A\u0645 \u0623\u0648\u0644\u0627\u064B.";
+              errBox.textContent = msg;
               errBox.classList.remove("hidden");
+              if (onFail) onFail(msg);
               return;
             }
-            if (pwd !== conf) {
-              errBox.textContent = t(lang, "passwordsMismatch");
-              errBox.classList.remove("hidden");
-              return;
-            }
-            submitBtn.disabled = true;
-            submitBtn.textContent = t(lang, "calibratingKdf");
             try {
-              const res = await session2.createVault({ masterPassword: pwd });
-              pwdInput.value = "";
-              confirmInput.value = "";
+              const res = await session2.createVaultFromSyncCode({
+                syncInput: code,
+                secret,
+                enforceMinimums: true
+              });
+              showToast(
+                `${t(lang, "syncSuccessToast")} (+${res.summary.added})`,
+                "success",
+                3800
+              );
               onRecoveryConfirmed && onRecoveryConfirmed(res.recoveryKeyFormatted);
             } catch (err) {
-              errBox.textContent = formatError(err, lang);
+              const msg = formatError(err, lang);
+              errBox.textContent = msg;
               errBox.classList.remove("hidden");
-              submitBtn.disabled = false;
-              submitBtn.textContent = t(lang, "createVaultBtn");
+              if (onFail) onFail(msg);
             }
-          }
-        },
-        errBox,
-        el(
-          "div",
-          { class: "field" },
-          el("label", { class: "field-label", for: "create-master-pwd" }, t(lang, "masterPasswordLabel")),
-          el("div", { class: "input-row" }, pwdInput, toggleEye),
-          meter.wrap
-        ),
-        el(
-          "div",
-          { class: "field" },
-          el("label", { class: "field-label", for: "confirm-master-pwd" }, t(lang, "confirmPasswordLabel")),
-          confirmInput
-        ),
-        el("div", { class: "banner banner-info" }, el("span", null, t(lang, "noHintNote"))),
-        el("div", { class: "field" }),
-        submitBtn
-      );
-      const card2 = el(
-        "section",
-        { class: "glass-card auth-card" },
-        topTools,
-        el(
-          "div",
-          { class: "auth-hero" },
-          el("div", { class: "auth-hero-icon" }, svgIcon("shield", 32)),
-          el("h1", null, t(lang, "createVaultTitle")),
-          el("p", null, t(lang, "createVaultSubtitle"))
-        ),
-        hasPendingSync ? el("div", { class: "banner banner-info", "data-testid": "pending-sync-banner" }, el("span", null, t(lang, "syncPendingUnlockBanner"))) : null,
-        form
-      );
+          };
+          const renderTransferLock = () => {
+            clearNode(lockHost);
+            segPat.classList.toggle("is-active", transferLockMode === "pattern");
+            segPwd.classList.toggle("is-active", transferLockMode === "password");
+            if (transferLockMode === "pattern") {
+              const pad = createPatternPad({
+                lang,
+                hint: lang === "en" ? "Draw the SAME pattern used on your old device" : "\u0627\u0631\u0633\u0645 \u0646\u0641\u0633 \u0627\u0644\u0646\u0645\u0637 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0639\u0644\u0649 \u062C\u0647\u0627\u0632\u0643 \u0627\u0644\u0642\u062F\u064A\u0645",
+                onComplete: async (secret) => {
+                  pad.setDisabled(true);
+                  pad.setSuccess(t(lang, "calibratingKdf"));
+                  await runTransfer(secret, (msg) => {
+                    pad.setDisabled(false);
+                    pad.setError(msg);
+                  });
+                }
+              });
+              lockHost.appendChild(pad.wrap);
+            } else {
+              const pwdIn = el("input", {
+                type: "password",
+                class: "input ltr-value",
+                autocomplete: "off",
+                spellcheck: "false",
+                placeholder: lang === "en" ? "Same password as old device" : "\u0646\u0641\u0633 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0627\u0644\u062C\u0647\u0627\u0632 \u0627\u0644\u0642\u062F\u064A\u0645",
+                required: true
+              });
+              const goBtn = el("button", { type: "submit", class: "btn btn-primary btn-block" }, svgIcon("link", 17), t(lang, "transferStartBtn"));
+              const tForm = el(
+                "form",
+                {
+                  onSubmit: async (e) => {
+                    e.preventDefault();
+                    goBtn.disabled = true;
+                    goBtn.textContent = t(lang, "unlocking");
+                    await runTransfer(pwdIn.value, () => {
+                      goBtn.disabled = false;
+                      goBtn.textContent = t(lang, "transferStartBtn");
+                    });
+                  }
+                },
+                el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "syncPassLabel")), pwdIn),
+                goBtn
+              );
+              lockHost.appendChild(tForm);
+            }
+          };
+          segPat.addEventListener("click", () => {
+            transferLockMode = "pattern";
+            renderTransferLock();
+          });
+          segPwd.addEventListener("click", () => {
+            transferLockMode = "password";
+            renderTransferLock();
+          });
+          renderTransferLock();
+          card2.appendChild(
+            el("div", { class: "field" }, el("label", { class: "field-label" }, t(lang, "syncReceiveCodeLabel")), codeIn)
+          );
+          card2.appendChild(el("div", { class: "segmented" }, segPat, segPwd));
+          card2.appendChild(lockHost);
+        }
+        card2.appendChild(
+          el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-ghost btn-block",
+              onClick: () => {
+                createMode = createMode === "transfer" ? "pattern" : "transfer";
+                renderCreateCard();
+              }
+            },
+            svgIcon(createMode === "transfer" ? "shield" : "link", 17),
+            createMode === "transfer" ? t(lang, "createVaultTitle") : t(lang, "transferFromOldBtn")
+          )
+        );
+      };
+      renderCreateCard();
       screen.appendChild(card2);
       return screen;
     }
-    let mode = "password";
+    let mode = session2.hasPatternUnlock ? "pattern" : "password";
     const card = el("section", { class: "glass-card auth-card" });
     const renderUnlockCard = () => {
-      while (card.firstChild) card.removeChild(card.firstChild);
+      clearNode(card);
       const errBox = el("div", { class: "banner banner-danger hidden", role: "alert" });
       const bioState = session2.getBiometricState();
       const lockoutMs = session2.getLockoutRemainingMs();
@@ -10919,7 +11619,61 @@ ${d.password}`;
         );
       }
       card.appendChild(errBox);
-      if (mode === "password") {
+      if (mode === "pattern") {
+        const pad = createPatternPad({
+          lang,
+          hint: t(lang, "patternDrawUnlock"),
+          onComplete: async (secret) => {
+            errBox.classList.add("hidden");
+            pad.setDisabled(true);
+            pad.setSuccess(t(lang, "unlocking"));
+            try {
+              await session2.unlockWithPassword(secret);
+            } catch (err) {
+              pad.setDisabled(false);
+              pad.setError(formatError(err, lang));
+              errBox.textContent = formatError(err, lang);
+              errBox.classList.remove("hidden");
+            }
+          }
+        });
+        card.appendChild(pad.wrap);
+        if (bioState.enabled) {
+          appendBioButton(card, bioState, session2, lang, errBox);
+        }
+        if (session2.hasPasswordUnlock) {
+          card.appendChild(
+            el(
+              "button",
+              {
+                type: "button",
+                class: "btn btn-ghost btn-block",
+                onClick: () => {
+                  mode = "password";
+                  renderUnlockCard();
+                }
+              },
+              svgIcon("key", 17),
+              t(lang, "usePasswordUnlock")
+            )
+          );
+        }
+        card.appendChild(
+          el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-ghost btn-block",
+              onClick: () => {
+                mode = "recovery";
+                renderUnlockCard();
+              }
+            },
+            svgIcon("key", 17),
+            t(lang, "useRecoveryKey")
+          )
+        );
+      } else if (mode === "password") {
         const pwdInput = el("input", {
           id: "unlock-master-pwd",
           type: "password",
@@ -10959,41 +11713,23 @@ ${d.password}`;
         );
         card.appendChild(form);
         if (bioState.enabled) {
-          const isNative = bioState.mode === "native";
-          const bioLabel = isNative ? lang === "en" ? "Unlock with Fingerprint" : "\u0641\u062A\u062D \u0628\u0628\u0635\u0645\u0629 \u0627\u0644\u0625\u0635\u0628\u0639" : t(lang, "unlockWithFingerprint");
-          const bioBtn = el(
-            "button",
-            {
-              type: "button",
-              class: `btn btn-block ${isNative ? "btn-primary" : ""}`.trim(),
-              disabled: !bioState.ready,
-              onClick: async () => {
-                errBox.classList.add("hidden");
-                try {
-                  await session2.unlockWithBiometric();
-                } catch (err) {
-                  errBox.textContent = formatError(err, lang);
-                  errBox.classList.remove("hidden");
+          appendBioButton(card, bioState, session2, lang, errBox);
+        }
+        if (session2.hasPatternUnlock) {
+          card.appendChild(
+            el(
+              "button",
+              {
+                type: "button",
+                class: "btn btn-ghost btn-block",
+                onClick: () => {
+                  mode = "pattern";
+                  renderUnlockCard();
                 }
-              }
-            },
-            svgIcon("fingerprint", 20),
-            bioLabel
+              },
+              t(lang, "usePatternUnlock")
+            )
           );
-          card.appendChild(bioBtn);
-          if (bioState.mode === "convenience" && !bioState.ready) {
-            card.appendChild(
-              el(
-                "div",
-                { class: "banner banner-warn" },
-                el(
-                  "span",
-                  null,
-                  lang === "en" ? "Convenience biometric mode requires Master Password after cold start or 24h." : "\u0648\u0636\u0639 \u0627\u0644\u0628\u0635\u0645\u0629 \u0627\u0644\u0633\u0631\u064A\u0639 \u064A\u062A\u0637\u0644\u0628 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629 \u0628\u0639\u062F \u0625\u0639\u0627\u062F\u0629 \u0627\u0644\u062A\u0634\u063A\u064A\u0644 \u0623\u0648 \u0643\u0644 \u0662\u0664 \u0633\u0627\u0639\u0629."
-                )
-              )
-            );
-          }
         }
         card.appendChild(
           el(
@@ -11071,11 +11807,11 @@ ${d.password}`;
               type: "button",
               class: "btn btn-ghost btn-block",
               onClick: () => {
-                mode = "password";
+                mode = session2.hasPatternUnlock ? "pattern" : "password";
                 renderUnlockCard();
               }
             },
-            t(lang, "backToPassword")
+            session2.hasPatternUnlock ? t(lang, "usePatternUnlock") : t(lang, "backToPassword")
           )
         );
       }
@@ -11084,9 +11820,46 @@ ${d.password}`;
     screen.appendChild(card);
     return screen;
   }
+  function appendBioButton(card, bioState, session2, lang, errBox) {
+    const isNative = bioState.mode === "native";
+    const bioLabel = isNative ? lang === "en" ? "Unlock with Fingerprint" : "\u0641\u062A\u062D \u0628\u0628\u0635\u0645\u0629 \u0627\u0644\u0625\u0635\u0628\u0639" : t(lang, "unlockWithFingerprint");
+    const bioBtn = el(
+      "button",
+      {
+        type: "button",
+        class: `btn btn-block ${isNative ? "btn-primary" : ""}`.trim(),
+        disabled: !bioState.ready,
+        onClick: async () => {
+          errBox.classList.add("hidden");
+          try {
+            await session2.unlockWithBiometric();
+          } catch (err) {
+            errBox.textContent = formatError(err, lang);
+            errBox.classList.remove("hidden");
+          }
+        }
+      },
+      svgIcon("fingerprint", 20),
+      bioLabel
+    );
+    card.appendChild(bioBtn);
+    if (bioState.mode === "convenience" && !bioState.ready) {
+      card.appendChild(
+        el(
+          "div",
+          { class: "banner banner-warn" },
+          el(
+            "span",
+            null,
+            lang === "en" ? "Convenience biometric mode requires your lock after cold start or 24h." : "\u0648\u0636\u0639 \u0627\u0644\u0628\u0635\u0645\u0629 \u0627\u0644\u0633\u0631\u064A\u0639 \u064A\u062A\u0637\u0644\u0628 \u0627\u0644\u0646\u0645\u0637 \u0623\u0648 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0628\u0639\u062F \u0625\u0639\u0627\u062F\u0629 \u0627\u0644\u062A\u0634\u063A\u064A\u0644 \u0623\u0648 \u0643\u0644 \u0662\u0664 \u0633\u0627\u0639\u0629."
+          )
+        )
+      );
+    }
+  }
 
   // src/main.js
-  var APP_VERSION = "2.2.0";
+  var APP_VERSION = "2.3.0";
   function isCapacitorAndroid() {
     return typeof window !== "undefined" && typeof window.Capacitor !== "undefined" && window.Capacitor?.isNativePlatform?.() === true && window.Capacitor?.getPlatform?.() === "android";
   }
@@ -11242,6 +12015,7 @@ ${d.password}`;
           lang,
           pendingRecoveryKey: appState.pendingRecoveryKey,
           hasPendingSync: Boolean(appState.pendingSyncCode),
+          pendingSyncCode: appState.pendingSyncCode,
           onToggleLang: async () => {
             await session.updateSettings({ lang: lang === "ar" ? "en" : "ar" });
             applyThemeAndDirection();
@@ -11760,7 +12534,9 @@ ${d.password}`;
       session.handleVisibilityChange(document.hidden);
     });
     window.addEventListener("blur", () => {
-      if (session.isUnlocked) session.setPrivacyBlur(true);
+      if (session.isUnlocked && session.settings?.privacyBlurOnBlur === true) {
+        session.setPrivacyBlur(true);
+      }
     });
     window.addEventListener("focus", () => {
       session.setPrivacyBlur(false);

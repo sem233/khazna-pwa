@@ -17,7 +17,7 @@ import { renderStatsView } from './ui/stats-view.js';
 import { openSyncSheet } from './ui/sync-sheet.js';
 import { renderUnlockView } from './ui/unlock-view.js';
 
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 
 /**
  * Returns true when running inside a real Capacitor Android app.
@@ -207,6 +207,7 @@ function renderApp({ preserveSearchFocus = false } = {}) {
         lang,
         pendingRecoveryKey: appState.pendingRecoveryKey,
         hasPendingSync: Boolean(appState.pendingSyncCode),
+        pendingSyncCode: appState.pendingSyncCode,
         onToggleLang: async () => {
           await session.updateSettings({ lang: lang === 'ar' ? 'en' : 'ar' });
           applyThemeAndDirection();
@@ -781,7 +782,9 @@ function wireGlobalEvents() {
   });
 
   window.addEventListener('blur', () => {
-    if (session.isUnlocked) session.setPrivacyBlur(true);
+    if (session.isUnlocked && session.settings?.privacyBlurOnBlur === true) {
+      session.setPrivacyBlur(true);
+    }
   });
   window.addEventListener('focus', () => {
     session.setPrivacyBlur(false);

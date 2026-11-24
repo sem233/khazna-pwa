@@ -178,148 +178,94 @@ export function renderCardsView({ session, lang, cards, onRefresh }) {
 
     let reauthedCvv = false;
 
+    // Make the 3D bank card itself tap-to-flip for an effortless, chic experience
+    widget.scene.classList.add('is-clickable');
+    widget.scene.addEventListener('click', () => {
+      triggerHaptic(10);
+      widget.toggleFlip();
+    });
+
     const flipBtn = el(
       'button',
       {
         type: 'button',
-        class: 'btn btn-sm',
+        class: 'btn btn-icon-sm btn-ghost',
         'aria-label': `${t(lang, 'flipCard')} ${d.cardName}`,
+        title: t(lang, 'flipCard'),
         onClick: () => {
           triggerHaptic(10);
           widget.toggleFlip();
         },
       },
-      svgIcon('flip', 15),
-      t(lang, 'flipCard')
+      svgIcon('flip', 16)
     );
 
-    const holdNumBtn = el(
-      'button',
-      { type: 'button', class: 'btn btn-sm', title: t(lang, 'holdToReveal') },
-      svgIcon('eye', 15),
-      t(lang, 'cardNumberLabel')
-    );
-    attachHoldToReveal(holdNumBtn, {
-      onReveal: () => widget.setNumberText(formatCardNumber(d.number, brand)),
-      onHide: () => widget.setNumberText(maskCardNumber(d.number, brand)),
-      autoHideMs: 10000,
-    });
+    const copyNumBtn = d.number
+      ? el(
+          'button',
+          {
+            type: 'button',
+            class: 'btn btn-sm btn-primary card-simple-copy',
+            onClick: () => copySecret(normalizeCardInput(d.number), t(lang, 'cardNumberLabel')),
+          },
+          svgIcon('copy', 14),
+          t(lang, 'copyNumberShort')
+        )
+      : null;
 
-    const revealCvvBtn = el(
+    const cvvBtn = (d.cvv || d.pin)
+      ? el(
+          'button',
+          {
+            type: 'button',
+            class: 'btn btn-sm',
+            onClick: async () => {
+              if (!reauthedCvv) {
+                const ok = await requestReauth({ session, lang });
+                if (!ok) return;
+                reauthedCvv = true;
+              }
+              widget.setFlipped(true);
+              widget.setCvvText(d.cvv || '—');
+              widget.setPinText(d.pin || '—');
+              if (d.cvv) {
+                await copySecret(d.cvv, 'CVV');
+              }
+              setTimeout(() => {
+                widget.setCvvText('•••');
+                widget.setPinText('••••');
+                reauthedCvv = false;
+              }, 10000);
+            },
+          },
+          svgIcon('eye', 14),
+          'CVV'
+        )
+      : null;
+
+    const editBtn = el(
       'button',
       {
         type: 'button',
-        class: 'btn btn-sm',
-        onClick: async () => {
-          if (!reauthedCvv) {
-            const ok = await requestReauth({ session, lang });
-            if (!ok) return;
-            reauthedCvv = true;
-          }
-          widget.setFlipped(true);
-          widget.setCvvText(d.cvv || '—');
-          widget.setPinText(d.pin || '—');
-          setTimeout(() => {
-            widget.setCvvText('•••');
-            widget.setPinText('••••');
-            reauthedCvv = false;
-          }, 10000);
-        },
+        class: 'btn btn-icon-sm btn-ghost',
+        'aria-label': `${t(lang, 'edit')} ${d.cardName}`,
+        title: t(lang, 'edit'),
+        onClick: () => openCardEditorSheet({ session, lang, card, onSaved: onRefresh }),
       },
-      svgIcon('eye', 15),
-      'CVV / PIN'
-    );
-
-    const copyActions = el(
-      'div',
-      { class: 'entry-actions-row' },
-      d.number
-        ? el('button', { type: 'button', class: 'btn btn-sm', onClick: () => copySecret(normalizeCardInput(d.number), t(lang, 'cardNumberLabel')) }, svgIcon('copy', 14), t(lang, 'cardNumberLabel'))
-        : null,
-      d.holderName
-        ? el('button', { type: 'button', class: 'btn btn-sm', onClick: () => copySecret(d.holderName, t(lang, 'holderNameLabel')) }, svgIcon('copy', 14), t(lang, 'holderNameLabel'))
-        : null,
-      d.expiry
-        ? el('button', { type: 'button', class: 'btn btn-sm', onClick: () => copySecret(d.expiry, t(lang, 'expiryLabel')) }, svgIcon('copy', 14), d.expiry)
-        : null,
-      d.cvv
-        ? el('button', {
-            type: 'button',
-            class: 'btn btn-sm',
-            onClick: async () => {
-              const ok = await requestReauth({ session, lang });
-              if (!ok) return;
-              await copySecret(d.cvv, 'CVV');
-            },
-          }, svgIcon('copy', 14), 'CVV')
-        : null,
-      d.pin
-        ? el('button', {
-            type: 'button',
-            class: 'btn btn-sm',
-            onClick: async () => {
-              const ok = await requestReauth({ session, lang });
-              if (!ok) return;
-              await copySecret(d.pin, 'PIN');
-            },
-          }, svgIcon('copy', 14), 'PIN')
-        : null,
-      el(
-        'button',
-        {
-          type: 'button',
-          class: 'btn btn-sm btn-primary',
-          onClick: async () => {
-            if (d.cvv || d.pin) {
-              const ok = await requestReauth({ session, lang });
-              if (!ok) return;
-            }
-            await copySecret(formatCardCopyAll(d, lang), t(lang, 'copyAll'));
-          },
-        },
-        svgIcon('copy', 14),
-        t(lang, 'copyAll')
-      )
+      svgIcon('edit', 16)
     );
 
     const wrapper = el(
       'article',
-      { class: 'glass-card glass-card-compact bank-card-wrapper stagger-item' },
+      { class: 'glass-card glass-card-compact bank-card-wrapper bank-card-simple stagger-item' },
       widget.scene,
       partial ? el('div', { class: 'banner banner-warn' }, el('span', null, t(lang, 'partialCardBadge'))) : null,
       el(
         'div',
-        { class: 'entry-actions-row' },
-        flipBtn,
-        holdNumBtn,
-        (d.cvv || d.pin) ? revealCvvBtn : null,
-        el(
-          'button',
-          {
-            type: 'button',
-            class: 'btn btn-sm',
-            'aria-label': `${t(lang, 'edit')} ${d.cardName}`,
-            onClick: () => openCardEditorSheet({ session, lang, card, onSaved: onRefresh }),
-          },
-          svgIcon('edit', 14),
-          t(lang, 'edit')
-        ),
-        el(
-          'button',
-          {
-            type: 'button',
-            class: 'btn btn-sm btn-danger',
-            'aria-label': `${t(lang, 'delete')} ${d.cardName}`,
-            onClick: async () => {
-              await session.trashRecord(card.id);
-              showToast(t(lang, 'delete'), 'info');
-              await onRefresh();
-            },
-          },
-          svgIcon('trash', 14)
-        )
-      ),
-      copyActions
+        { class: 'card-simple-bar' },
+        el('div', { class: 'card-simple-primary' }, copyNumBtn, cvvBtn),
+        el('div', { class: 'card-simple-icons' }, flipBtn, editBtn)
+      )
     );
 
     grid.appendChild(wrapper);
@@ -528,7 +474,46 @@ export function openCardEditorSheet({ session, lang, card = null, onSaved }) {
       { class: 'form-grid-2' },
       el('button', { type: 'button', class: 'btn', onClick: () => sheet.close() }, t(lang, 'cancel')),
       el('button', { type: 'submit', class: 'btn btn-primary' }, t(lang, 'save'))
-    )
+    ),
+    card
+      ? el(
+          'div',
+          { class: 'form-grid-2' },
+          el(
+            'button',
+            {
+              type: 'button',
+              class: 'btn',
+              onClick: async () => {
+                if (state.cvv || state.pin) {
+                  const ok = await requestReauth({ session, lang });
+                  if (!ok) return;
+                }
+                await session.clipboard.copySecret(formatCardCopyAll(state, lang), session.settings?.clipboardClearSec ?? 30);
+                triggerHaptic();
+                showToast(`${t(lang, 'copiedToast')}: ${t(lang, 'copyAll')}`, 'success');
+              },
+            },
+            svgIcon('copy', 15),
+            t(lang, 'copyAll')
+          ),
+          el(
+            'button',
+            {
+              type: 'button',
+              class: 'btn btn-danger',
+              onClick: async () => {
+                await session.trashRecord(card.id);
+                sheet.close();
+                showToast(t(lang, 'delete'), 'info');
+                onSaved && (await onSaved());
+              },
+            },
+            svgIcon('trash', 15),
+            t(lang, 'delete')
+          )
+        )
+      : null
   );
 
   const sheet = openBottomSheet({

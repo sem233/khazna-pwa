@@ -11,7 +11,8 @@
  */
 
 import { formatError, t } from '../i18n/strings.js';
-import { el, openBottomSheet, requestReauth, showToast, svgIcon } from './dom.js';
+import { clearNode, el, openBottomSheet, requestReauth, showToast, svgIcon } from './dom.js';
+import { createPatternPad } from './pattern-pad.js';
 
 export function renderSettingsView({
   session,
@@ -146,6 +147,14 @@ export function renderSettingsView({
     },
   });
 
+  const privacyBlurCheck = el('input', {
+    type: 'checkbox',
+    checked: settings.privacyBlurOnBlur === true,
+    onChange: async (e) => {
+      await session.updateSettings({ privacyBlurOnBlur: e.target.checked });
+    },
+  });
+
   const wipeSel = el(
     'select',
     {
@@ -212,6 +221,9 @@ export function renderSettingsView({
       el('div', { class: 'settings-row' }, el('span', { class: 'settings-row-title' }, t(lang, 'clipboardClearLabel')), clipSel),
       el('div', { class: 'banner banner-info' }, el('span', null, t(lang, 'clipboardLimitNote'))),
       el('label', { class: 'checkbox-row' }, reauthCheck, el('span', null, t(lang, 'reauthLabel'))),
+      !isNativeAndroid
+        ? el('label', { class: 'checkbox-row' }, privacyBlurCheck, el('span', null, t(lang, 'privacyBlurLabel')))
+        : null,
       el(
         'div',
         { class: 'settings-row' },
@@ -226,22 +238,32 @@ export function renderSettingsView({
           'button',
           {
             type: 'button',
-            class: 'btn',
-            onClick: () => openChangeMasterPasswordSheet({ session, lang }),
+            class: 'btn btn-primary',
+            onClick: () => openSetPatternSheet({ session, lang, onDone: onRefresh }),
           },
-          svgIcon('key', 16),
-          t(lang, 'changeMasterPwd')
+          svgIcon('lock', 16),
+          t(lang, 'changePatternBtn')
         ),
         el(
           'button',
           {
             type: 'button',
             class: 'btn',
-            onClick: () => openRotateRecoverySheet({ session, lang }),
+            onClick: () => openChangeMasterPasswordSheet({ session, lang, onDone: onRefresh }),
           },
-          svgIcon('refresh', 16),
-          t(lang, 'rotateRecoveryKey')
+          svgIcon('key', 16),
+          session.hasPasswordUnlock ? t(lang, 'changeMasterPwd') : t(lang, 'addOptionalPasswordBtn')
         )
+      ),
+      el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-block',
+          onClick: () => openRotateRecoverySheet({ session, lang }),
+        },
+        svgIcon('refresh', 16),
+        t(lang, 'rotateRecoveryKey')
       )
     )
   );
@@ -384,7 +406,7 @@ export function renderSettingsView({
       'div',
       { class: 'settings-row' },
       el('span', { class: 'settings-row-title' }, t(lang, 'appVersionLabel')),
-      el('span', { class: 'settings-row-desc ltr-inline mono' }, `v${integrityInfo?.version || '2.2.0'} • ${kdfInfo}`)
+      el('span', { class: 'settings-row-desc ltr-inline mono' }, `v${integrityInfo?.version || '2.3.0'} • ${kdfInfo}`)
     )
   );
   pwaCard.appendChild(
@@ -409,8 +431,6 @@ export function renderSettingsView({
         )
       )
     );
-  } else {
-    pwaCard.appendChild(el('div', { class: 'banner banner-warn' }, el('span', null, t(lang, 'screenshotHonesty'))));
   }
 
   // Danger Zone: Wipe Vault
@@ -431,176 +451,313 @@ export function renderSettingsView({
   return container;
 }
 
-function openBiometricSetupSheet({ session, lang, onDone }) {
+function renderCurrentLockStep({ session, lang, onVerified, submitLabel }) {
+  const wrap = el('div', { class: 'settings-group' });
   const errBox = el('div', { class: 'banner banner-danger hidden', role: 'alert' });
-  const pwdIn = el('input', {
-    type: 'password',
-    class: 'input ltr-value',
-    autocomplete: 'off',
-    spellcheck: 'false',
-    required: true,
-    placeholder: t(lang, 'masterPasswordLabel'),
-  });
+  let method = session.hasPatternUnlock ? 'pattern' : 'password';
+
+  const draw = () => {
+    clearNode(wrap);
+    wrap.appendChild(errBox);
+
+    if (method === 'pattern') {
+      const pad = createPatternPad({
+        lang,
+        hint: lang === 'en' ? 'Draw your current pattern to continue' : 'ارسم النمط الحالي للمتابعة',
+        onComplete: async (secret) => {
+          errBox.classList.add('hidden');
+          pad.setDisabled(true);
+          try {
+            await onVerified(secret);
+          } catch (err) {
+            pad.setDisabled(false);
+            pad.setError(formatError(err, lang));
+            errBox.textContent = formatError(err, lang);
+            errBox.classList.remove('hidden');
+          }
+        },
+      });
+      wrap.appendChild(pad.wrap);
+      if (session.hasPasswordUnlock) {
+        wrap.appendChild(
+          el('button', { type: 'button', class: 'btn btn-ghost btn-sm btn-block', onClick: () => { method = 'password'; draw(); } }, t(lang, 'usePasswordUnlock'))
+        );
+      }
+    } else {
+      const pwdIn = el('input', {
+        type: 'password',
+        class: 'input ltr-value',
+        autocomplete: 'off',
+        spellcheck: 'false',
+        required: true,
+        placeholder: t(lang, 'masterPasswordLabel'),
+      });
+      const submitBtn = el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, submitLabel || t(lang, 'confirmBtn'));
+      const form = el(
+        'form',
+        {
+          onSubmit: async (e) => {
+            e.preventDefault();
+            errBox.classList.add('hidden');
+            submitBtn.disabled = true;
+            try {
+              await onVerified(pwdIn.value);
+              pwdIn.value = '';
+            } catch (err) {
+              errBox.textContent = formatError(err, lang);
+              errBox.classList.remove('hidden');
+              submitBtn.disabled = false;
+            }
+          },
+        },
+        el('div', { class: 'field' }, el('label', { class: 'field-label' }, t(lang, 'masterPasswordLabel')), pwdIn),
+        submitBtn
+      );
+      wrap.appendChild(form);
+      if (session.hasPatternUnlock) {
+        wrap.appendChild(
+          el('button', { type: 'button', class: 'btn btn-ghost btn-sm btn-block', onClick: () => { method = 'pattern'; draw(); } }, t(lang, 'usePatternUnlock'))
+        );
+      }
+    }
+  };
+
+  draw();
+  return wrap;
+}
+
+function openBiometricSetupSheet({ session, lang, onDone }) {
   const body = el('div', { class: 'settings-group' });
 
-  const submitBtn = el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, svgIcon('fingerprint', 18), t(lang, 'enableBiometric'));
-
-  const form = el(
-    'form',
-    {
-      onSubmit: async (e) => {
-        e.preventDefault();
-        errBox.classList.add('hidden');
-        submitBtn.disabled = true;
-        try {
-          const res = await session.enrollBiometricWithPassword(pwdIn.value);
-          pwdIn.value = '';
-          if (res.mode === 'prf' || res.mode === 'native') {
-            sheet.close();
-            showToast(
-              res.mode === 'native'
-                ? lang === 'en'
-                  ? 'Native Android Biometric Enabled ✓'
-                  : 'تم تفعيل بصمة أندرويد بنجاح ✓'
-                : t(lang, 'biometricPrfActive'),
-              'success'
-            );
-            onDone && (await onDone());
-          } else if (res.mode === 'prf-unavailable') {
-            while (body.firstChild) body.removeChild(body.firstChild);
-            body.appendChild(el('div', { class: 'banner banner-warn' }, el('span', null, lang === 'en' ? res.warningEn : res.warningAr)));
-            body.appendChild(
+  body.appendChild(
+    renderCurrentLockStep({
+      session,
+      lang,
+      submitLabel: t(lang, 'enableBiometric'),
+      onVerified: async (secret) => {
+        const res = await session.enrollBiometricWithPassword(secret);
+        if (res.mode === 'prf' || res.mode === 'native') {
+          sheet.close();
+          showToast(
+            res.mode === 'native'
+              ? lang === 'en'
+                ? 'Native Android Biometric Enabled ✓'
+                : 'تم تفعيل بصمة أندرويد بنجاح ✓'
+              : t(lang, 'biometricPrfActive'),
+            'success'
+          );
+          onDone && (await onDone());
+        } else if (res.mode === 'prf-unavailable') {
+          clearNode(body);
+          body.appendChild(el('div', { class: 'banner banner-warn' }, el('span', null, lang === 'en' ? res.warningEn : res.warningAr)));
+          body.appendChild(
+            el(
+              'div',
+              { class: 'form-grid-2' },
+              el('button', { type: 'button', class: 'btn', onClick: () => sheet.close() }, t(lang, 'cancel')),
               el(
-                'div',
-                { class: 'form-grid-2' },
-                el('button', { type: 'button', class: 'btn', onClick: () => sheet.close() }, t(lang, 'cancel')),
-                el(
-                  'button',
-                  {
-                    type: 'button',
-                    class: 'btn btn-primary',
-                    onClick: async () => {
-                      await res._armConvenience();
-                      sheet.close();
-                      showToast(t(lang, 'biometricConvActive'), 'warn', 4200);
-                      onDone && (await onDone());
-                    },
+                'button',
+                {
+                  type: 'button',
+                  class: 'btn btn-primary',
+                  onClick: async () => {
+                    await res._armConvenience();
+                    sheet.close();
+                    showToast(t(lang, 'biometricConvActive'), 'warn', 4200);
+                    onDone && (await onDone());
                   },
-                  lang === 'en' ? 'Enable Convenience Mode' : 'تفعيل وضع الراحة'
-                )
+                },
+                lang === 'en' ? 'Enable Convenience Mode' : 'تفعيل وضع الراحة'
               )
-            );
-          }
-        } catch (err) {
-          errBox.textContent = formatError(err, lang);
-          errBox.classList.remove('hidden');
-          submitBtn.disabled = false;
+            )
+          );
         }
       },
-    },
-    errBox,
-    el('div', { class: 'field' }, el('label', { class: 'field-label' }, t(lang, 'masterPasswordLabel')), pwdIn),
-    submitBtn
+    })
   );
 
-  body.appendChild(form);
   const sheet = openBottomSheet({ title: t(lang, 'biometricTitle'), content: body });
 }
 
-function openChangeMasterPasswordSheet({ session, lang }) {
+function openSetPatternSheet({ session, lang, onDone }) {
+  const host = el('div', { class: 'settings-group' });
   const errBox = el('div', { class: 'banner banner-danger hidden', role: 'alert' });
-  const curIn = el('input', { type: 'password', class: 'input ltr-value', autocomplete: 'off', required: true });
-  const newIn = el('input', { type: 'password', class: 'input ltr-value', autocomplete: 'off', required: true, minlength: 12 });
-  const confIn = el('input', { type: 'password', class: 'input ltr-value', autocomplete: 'off', required: true });
-  const submitBtn = el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, t(lang, 'save'));
 
-  const form = el(
-    'form',
-    {
-      onSubmit: async (e) => {
-        e.preventDefault();
+  const showNewPatternStep = (currentSecret) => {
+    clearNode(host);
+    host.appendChild(errBox);
+    let firstSecret = null;
+
+    const pad = createPatternPad({
+      lang,
+      hint: t(lang, 'patternDrawFirst'),
+      onComplete: async (newSecret) => {
         errBox.classList.add('hidden');
-        if (newIn.value !== confIn.value) {
-          errBox.textContent = t(lang, 'passwordsMismatch');
+        if (!firstSecret) {
+          firstSecret = newSecret;
+          pad.setSuccess(t(lang, 'patternDrawConfirm'));
+          setTimeout(() => pad.reset(t(lang, 'patternDrawConfirm')), 350);
+          return;
+        }
+        if (newSecret !== firstSecret) {
+          firstSecret = null;
+          pad.setError(t(lang, 'patternMismatch'));
+          errBox.textContent = t(lang, 'patternMismatch');
           errBox.classList.remove('hidden');
           return;
         }
-        submitBtn.disabled = true;
+        pad.setDisabled(true);
+        pad.setSuccess(t(lang, 'save'));
         try {
-          await session.changeMasterPassword({
-            currentPassword: curIn.value,
-            newMasterPassword: newIn.value,
-          });
-          curIn.value = '';
-          newIn.value = '';
-          confIn.value = '';
+          if (session.unlockMethod === 'pattern') {
+            await session.changeMasterPassword({
+              currentPassword: currentSecret,
+              newMasterPassword: newSecret,
+            });
+          } else {
+            await session.setSecondaryUnlock({
+              currentSecret,
+              altSecret: newSecret,
+            });
+          }
           sheet.close();
-          showToast(t(lang, 'changeMasterPwd'), 'success');
+          showToast(`${t(lang, 'changePatternBtn')} ✓`, 'success');
+          onDone && (await onDone());
         } catch (err) {
+          firstSecret = null;
+          pad.setDisabled(false);
+          pad.setError(formatError(err, lang));
           errBox.textContent = formatError(err, lang);
           errBox.classList.remove('hidden');
-          submitBtn.disabled = false;
         }
       },
-    },
-    errBox,
-    el('div', { class: 'field' }, el('label', { class: 'field-label' }, lang === 'en' ? 'Current Master Password' : 'كلمة المرور الرئيسية الحالية'), curIn),
-    el('div', { class: 'field' }, el('label', { class: 'field-label' }, lang === 'en' ? 'New Master Password (12+ chars)' : 'كلمة المرور الرئيسية الجديدة (١٢ حرفاً+)'), newIn),
-    el('div', { class: 'field' }, el('label', { class: 'field-label' }, t(lang, 'confirmPasswordLabel')), confIn),
-    submitBtn
+    });
+    host.appendChild(pad.wrap);
+  };
+
+  host.appendChild(
+    renderCurrentLockStep({
+      session,
+      lang,
+      submitLabel: t(lang, 'confirmBtn'),
+      onVerified: async (secret) => {
+        await session.verifyReauth({ masterPassword: secret });
+        showNewPatternStep(secret);
+      },
+    })
   );
 
-  const sheet = openBottomSheet({ title: t(lang, 'changeMasterPwd'), content: form });
+  const sheet = openBottomSheet({ title: t(lang, 'changePatternBtn'), content: host });
+}
+
+function openChangeMasterPasswordSheet({ session, lang, onDone }) {
+  const host = el('div', { class: 'settings-group' });
+  const errBox = el('div', { class: 'banner banner-danger hidden', role: 'alert' });
+
+  const showNewPwdForm = (currentSecret) => {
+    clearNode(host);
+    const newIn = el('input', { type: 'password', class: 'input ltr-value', autocomplete: 'off', required: true, minlength: 12 });
+    const confIn = el('input', { type: 'password', class: 'input ltr-value', autocomplete: 'off', required: true });
+    const submitBtn = el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, t(lang, 'save'));
+
+    const form = el(
+      'form',
+      {
+        onSubmit: async (e) => {
+          e.preventDefault();
+          errBox.classList.add('hidden');
+          if (newIn.value !== confIn.value) {
+            errBox.textContent = t(lang, 'passwordsMismatch');
+            errBox.classList.remove('hidden');
+            return;
+          }
+          submitBtn.disabled = true;
+          try {
+            if (session.unlockMethod === 'password') {
+              await session.changeMasterPassword({
+                currentPassword: currentSecret,
+                newMasterPassword: newIn.value,
+              });
+            } else {
+              await session.setSecondaryUnlock({
+                currentSecret,
+                altSecret: newIn.value,
+              });
+            }
+            newIn.value = '';
+            confIn.value = '';
+            sheet.close();
+            showToast(`${t(lang, 'save')} ✓`, 'success');
+            onDone && (await onDone());
+          } catch (err) {
+            errBox.textContent = formatError(err, lang);
+            errBox.classList.remove('hidden');
+            submitBtn.disabled = false;
+          }
+        },
+      },
+      errBox,
+      el('div', { class: 'field' }, el('label', { class: 'field-label' }, lang === 'en' ? 'New Master Password (12+ chars)' : 'كلمة المرور الرئيسية الجديدة (١٢ حرفاً+)'), newIn),
+      el('div', { class: 'field' }, el('label', { class: 'field-label' }, t(lang, 'confirmPasswordLabel')), confIn),
+      submitBtn
+    );
+    host.appendChild(form);
+  };
+
+  host.appendChild(
+    renderCurrentLockStep({
+      session,
+      lang,
+      submitLabel: t(lang, 'confirmBtn'),
+      onVerified: async (secret) => {
+        await session.verifyReauth({ masterPassword: secret });
+        showNewPwdForm(secret);
+      },
+    })
+  );
+
+  const sheet = openBottomSheet({
+    title: session.hasPasswordUnlock ? t(lang, 'changeMasterPwd') : t(lang, 'addOptionalPasswordBtn'),
+    content: host,
+  });
 }
 
 function openRotateRecoverySheet({ session, lang }) {
-  const errBox = el('div', { class: 'banner banner-danger hidden', role: 'alert' });
-  const pwdIn = el('input', { type: 'password', class: 'input ltr-value', autocomplete: 'off', required: true });
   const host = el('div', { class: 'settings-group' });
 
-  const form = el(
-    'form',
-    {
-      onSubmit: async (e) => {
-        e.preventDefault();
-        errBox.classList.add('hidden');
-        try {
-          const { recoveryKeyFormatted } = await session.rotateRecoveryKeyWithPassword(pwdIn.value);
-          pwdIn.value = '';
-          while (host.firstChild) host.removeChild(host.firstChild);
-          host.appendChild(el('div', { class: 'banner banner-warn' }, el('span', null, t(lang, 'recoveryModalWarn'))));
-          host.appendChild(el('div', { class: 'recovery-key-display' }, recoveryKeyFormatted));
-          host.appendChild(
-            el(
-              'button',
-              {
-                type: 'button',
-                class: 'btn btn-primary btn-block',
-                onClick: async () => {
-                  try {
-                    await session.clipboard.copySecret(recoveryKeyFormatted, 0);
-                    showToast(t(lang, 'copiedToast'), 'success');
-                  } catch (err) {
-                    showToast(formatError(err, lang), 'warn');
-                  }
-                },
+  host.appendChild(
+    renderCurrentLockStep({
+      session,
+      lang,
+      submitLabel: t(lang, 'rotateRecoveryKey'),
+      onVerified: async (secret) => {
+        const { recoveryKeyFormatted } = await session.rotateRecoveryKeyWithPassword(secret);
+        clearNode(host);
+        host.appendChild(el('div', { class: 'banner banner-warn' }, el('span', null, t(lang, 'recoveryModalWarn'))));
+        host.appendChild(el('div', { class: 'recovery-key-display' }, recoveryKeyFormatted));
+        host.appendChild(
+          el(
+            'button',
+            {
+              type: 'button',
+              class: 'btn btn-primary btn-block',
+              onClick: async () => {
+                try {
+                  await session.clipboard.copySecret(recoveryKeyFormatted, 0);
+                  showToast(t(lang, 'copiedToast'), 'success');
+                } catch (err) {
+                  showToast(formatError(err, lang), 'warn');
+                }
               },
-              svgIcon('copy', 16),
-              t(lang, 'copyRecoveryKey')
-            )
-          );
-        } catch (err) {
-          errBox.textContent = formatError(err, lang);
-          errBox.classList.remove('hidden');
-        }
+            },
+            svgIcon('copy', 16),
+            t(lang, 'copyRecoveryKey')
+          )
+        );
       },
-    },
-    errBox,
-    el('div', { class: 'field' }, el('label', { class: 'field-label' }, t(lang, 'masterPasswordLabel')), pwdIn),
-    el('button', { type: 'submit', class: 'btn btn-primary btn-block' }, t(lang, 'rotateRecoveryKey'))
+    })
   );
 
-  host.appendChild(form);
   openBottomSheet({ title: t(lang, 'rotateRecoveryKey'), content: host });
 }
 

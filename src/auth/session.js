@@ -15,9 +15,11 @@ import {
   encryptRecord,
   rewrapMasterPassword,
   rotateRecoveryKey,
+  setAltUnlockWrapper,
   unwrapDekWithPassword,
   unwrapDekWithRecoveryKey,
 } from '../crypto/vault-crypto.js';
+import { applySyncMerge, decodeSyncPackage, planSyncMerge } from '../import-export/sync.js';
 import { base64ToBytes, bytesToBase64, KhaznaError, randomId, zeroize } from '../crypto/utils.js';
 import {
   armConvenienceRamSession,
@@ -236,6 +238,18 @@ export class VaultSession {
     return this._blurred;
   }
 
+  get unlockMethod() {
+    return this._header?.unlockMethod === 'pattern' ? 'pattern' : 'password';
+  }
+
+  get hasPatternUnlock() {
+    return this.unlockMethod === 'pattern' || this._header?.wrappers?.alt?.method === 'pattern';
+  }
+
+  get hasPasswordUnlock() {
+    return this.unlockMethod === 'password' || this._header?.wrappers?.alt?.method === 'password';
+  }
+
   async init() {
     await this.refreshMeta();
     return {
@@ -403,6 +417,47 @@ export class VaultSession {
       header,
       recoveryKeyFormatted,
       kdfEngine,
+    };
+  }
+
+  /**
+   * Creates a new vault on a new device directly from an old device's encrypted Sync Code,
+   * using the EXACT same Pattern or Master Password as the old device so both devices stay in sync.
+   */
+  async createVaultFromSyncCode({ syncInput, secret, kdfSpec = null, enforceMinimums = true }) {
+    const incoming = await decodeSyncPackage({
+      input: syncInput,
+      passphrase: secret,
+    });
+
+    const hasIncomingSections = Array.isArray(incoming.sections) && incoming.sections.length > 0;
+    const created = await this.createVault({
+      masterPassword: secret,
+      kdfSpec,
+      enforceMinimums,
+      seedDefaultSections: !hasIncomingSections,
+    });
+
+    const localSections = await this.listRecords('section');
+    const plan = planSyncMerge({
+      incoming,
+      localSections,
+      localPasswords: [],
+      localCards: [],
+      localNotes: [],
+      strategy: 'smart',
+    });
+
+    const merged = await applySyncMerge({ session: this, plan });
+    return {
+      ...created,
+      summary: merged.summary,
+      counts: {
+        sections: incoming.sections?.length || 0,
+        passwords: incoming.passwords?.length || 0,
+        cards: incoming.cards?.length || 0,
+        notes: incoming.notes?.length || 0,
+      },
     };
   }
 
@@ -779,6 +834,23 @@ export class VaultSession {
     return { kdfEngine };
   }
 
+  async setSecondaryUnlock({ currentSecret, altSecret }) {
+    this._assertUnlocked();
+    const { updatedHeader } = await setAltUnlockWrapper({
+      header: this._header,
+      currentSecret,
+      altSecret,
+      useWorker: this._useWorker,
+    });
+    await this.storage.atomicOperationWithSnapshot({
+      reason: 'set-secondary-unlock',
+      newHeader: updatedHeader,
+    });
+    this._header = updatedHeader;
+    this._emit('header-updated', { reason: 'set-secondary-unlock' });
+    return true;
+  }
+
   async rotateRecoveryKeyWithPassword(masterPassword) {
     this._assertUnlocked();
     const { updatedHeader, recoveryKeyFormatted } = await rotateRecoveryKey({
@@ -1012,7 +1084,9 @@ export class VaultSession {
 
   handleVisibilityChange(hidden) {
     if (hidden) {
-      this.setPrivacyBlur(true);
+      if (this._settings?.privacyBlurOnBlur === true) {
+        this.setPrivacyBlur(true);
+      }
       if (this.isUnlocked) {
         const graceSec = Math.max(0, Math.min(300, this._settings?.bgGraceSec ?? 15));
         if (this._bgTimer) clearTimeout(this._bgTimer);

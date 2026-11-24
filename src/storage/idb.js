@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   clipboardClearSec: 30,
   copyComboMode: 'two-step',
   reauthSensitive: true,
+  privacyBlurOnBlur: false,
   lowEndBlur: 'auto',
   lastBackupAt: null,
   backupReminderDays: 7,
