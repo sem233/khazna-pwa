@@ -70,6 +70,7 @@ export const DEFAULT_SECTIONS = Object.freeze([
   { nameAr: 'عام', nameEn: 'General', emoji: '🔐', color: '#38bdf8' },
   { nameAr: 'البنوك والمال', nameEn: 'Banking', emoji: '🏦', color: '#10b981' },
   { nameAr: 'التواصل الاجتماعي', nameEn: 'Social', emoji: '💬', color: '#a78bfa' },
+  { nameAr: 'الفواتير', nameEn: 'Bills', emoji: '🧾', color: '#2dd4bf' },
   { nameAr: 'العمل', nameEn: 'Work', emoji: '💼', color: '#f59e0b' },
 ]);
 

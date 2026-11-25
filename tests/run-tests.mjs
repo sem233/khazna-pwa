@@ -166,7 +166,8 @@ await test('Session: Full lifecycle + Bulk Move (movePasswordsToSection) + decry
   assert.ok(session.isUnlocked);
 
   const sections = await session.listRecords('section');
-  assert.equal(sections.length, 4);
+  assert.equal(sections.length, 5);
+  assert.ok(sections.some((s) => s.data?.name === 'الفواتير' || s.data?.name === 'Bills'));
   const secA = sections[0].id;
   const secB = sections[1].id;
 
@@ -176,8 +177,10 @@ await test('Session: Full lifecycle + Bulk Move (movePasswordsToSection) + decry
   });
   const p2 = await session.saveRecord({
     type: 'password',
-    data: { title: 'Bank B', username: 'u2', password: 'p2', sectionId: secA },
+    data: { title: 'Electricity Bill', username: '01556265247', password: '', url: '', sectionId: secA },
   });
+  assert.equal(p2.data.password, '');
+  assert.equal(p2.data.url, '');
 
   // Verify decryptRecord exists and works
   const rawRec = await storage.getRecord(p1.id);
@@ -294,12 +297,20 @@ await test('Domain: Card brand detection, Luhn, masking, Arabic search & audit',
   assert.ok(maskCardNumber('4532015112830366', 'visa').endsWith('0366'));
 
   const list = [
-    { id: '1', data: { title: 'البنك الأهلي', username: 'ahmed', password: 'abc', sectionId: 's1' }, updatedAt: '2026-01-01' },
-    { id: '2', data: { title: 'GitHub', username: 'dev', password: 'abc', sectionId: 's2' }, updatedAt: '2026-01-02' },
+    { id: '1', data: { title: 'البنك الأهلي', username: 'ahmed', password: 'abc', sectionId: 's1', favorite: false }, updatedAt: '2026-01-05', createdAt: '2026-01-05' },
+    { id: '2', data: { title: 'GitHub', username: 'dev', password: 'abc', sectionId: 's2', favorite: true }, updatedAt: '2026-01-01', createdAt: '2026-01-01' },
   ];
   const res = filterAndSortPasswords(list, { query: 'الاهلي' });
   assert.equal(res.length, 1);
   assert.equal(res[0].id, '1');
+
+  // Favorites MUST always sort first regardless of sort order
+  const sortedUpdated = filterAndSortPasswords(list, { sortBy: 'updated-desc' });
+  assert.equal(sortedUpdated[0].id, '2');
+  const sortedTitle = filterAndSortPasswords(list, { sortBy: 'title-asc' });
+  assert.equal(sortedTitle[0].id, '2');
+  const sortedCreated = filterAndSortPasswords(list, { sortBy: 'created-desc' });
+  assert.equal(sortedCreated[0].id, '2');
 
   const stats = computeVaultAuditAndStats({ sections: [], passwords: list, cards: [], notes: [] });
   assert.equal(stats.audit.reusedCount, 2);

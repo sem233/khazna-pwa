@@ -67,6 +67,10 @@ export function filterAndSortPasswords(
   filtered.sort((a, b) => {
     const da = a.data || {};
     const db = b.data || {};
+    // Favorites / pinned items ALWAYS appear at the top of their section
+    if (Boolean(da.favorite) !== Boolean(db.favorite)) {
+      return da.favorite ? -1 : 1;
+    }
     if (sortBy === 'title-asc') {
       return String(da.title || '').localeCompare(String(db.title || ''), 'ar');
     }
@@ -75,10 +79,6 @@ export function filterAndSortPasswords(
     }
     if (sortBy === 'created-desc') {
       return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
-    }
-    if (sortBy === 'favorites-first') {
-      if (Boolean(da.favorite) !== Boolean(db.favorite)) return da.favorite ? -1 : 1;
-      return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
     }
     // default: updated-desc
     return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));

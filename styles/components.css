@@ -3,14 +3,14 @@
 /* --- App Shell --- */
 .app-shell {
   width: 100%;
-  max-width: 960px;
+  max-width: 1320px;
   margin-inline: auto;
-  padding-inline: 16px;
+  padding-inline: 20px;
   padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 92px);
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   overflow-x: clip;
 }
 
@@ -24,7 +24,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-inline: 16px;
+  padding-inline: 20px;
   background: var(--bg-glass);
   backdrop-filter: var(--blur-lg);
   -webkit-backdrop-filter: var(--blur-lg);
@@ -33,7 +33,7 @@
 
 .header-inner {
   width: 100%;
-  max-width: 960px;
+  max-width: 1320px;
   margin-inline: auto;
   display: flex;
   align-items: center;
@@ -1754,4 +1754,679 @@ html.chrome-popup-mode .pattern-svg {
 
 .pattern-svg.is-success .pattern-dot.is-active .pattern-dot-core {
   fill: var(--success);
+}
+
+/* ==========================================================================
+   v2.5.0 Creative Glassmorphism Vault Dashboard & Multi-Column Cards
+   ========================================================================== */
+
+.vault-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- 1) Top 4-Card Glass KPI Strip --- */
+.vault-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.vault-kpi-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 179, 224, 0.2);
+  background: linear-gradient(155deg, rgba(24, 37, 68, 0.62) 0%, rgba(12, 20, 42, 0.56) 100%);
+  backdrop-filter: var(--blur-lg);
+  -webkit-backdrop-filter: var(--blur-lg);
+  box-shadow: 0 12px 30px -14px rgba(2, 6, 23, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+  text-align: center;
+  overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vault-kpi-card::before {
+  content: '';
+  position: absolute;
+  inset-inline: 18%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.55), transparent);
+  pointer-events: none;
+}
+
+.vault-kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--sec-accent, rgba(56, 189, 248, 0.5));
+  box-shadow: 0 16px 32px -12px rgba(2, 6, 23, 0.75), 0 0 22px -8px var(--sec-accent, rgba(56, 189, 248, 0.45)), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.vault-kpi-card.is-active {
+  border-color: var(--sec-accent, #38bdf8);
+  background: linear-gradient(155deg, rgba(30, 58, 110, 0.68) 0%, rgba(14, 24, 52, 0.68) 100%);
+  box-shadow: 0 0 0 1px var(--sec-accent, rgba(56, 189, 248, 0.4)), 0 0 28px -8px var(--sec-accent, rgba(56, 189, 248, 0.6)), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.vault-kpi-label {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-kpi-value {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.05;
+  color: var(--sec-accent, #38bdf8);
+  text-shadow: 0 0 18px rgba(56, 189, 248, 0.48);
+  letter-spacing: -0.02em;
+}
+
+/* --- 2) Wrapping Centered Section Pills (ALL Sections Always Visible!) --- */
+.section-strip-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-block: 2px;
+}
+
+.sec-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding-inline: 14px;
+  padding-block: 6px;
+  border-radius: 13px;
+  border: 1px solid rgba(148, 179, 224, 0.2);
+  background: linear-gradient(145deg, rgba(20, 32, 60, 0.64) 0%, rgba(12, 20, 42, 0.56) 100%);
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 0.16s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.2s ease;
+}
+
+.sec-pill:hover {
+  transform: translateY(-1px);
+  border-color: var(--sec-accent, rgba(56, 189, 248, 0.48));
+  color: var(--text-primary);
+  background: rgba(28, 44, 82, 0.72);
+}
+
+.sec-pill.is-active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 55%, #0ea5e9 100%);
+  color: #ffffff;
+  box-shadow: 0 0 22px -2px rgba(59, 130, 246, 0.72), 0 8px 18px -6px rgba(37, 99, 235, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.sec-pill.is-active .sec-dot {
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.85);
+}
+
+.sec-pill-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  color: inherit;
+}
+
+.sec-pill.is-active .sec-pill-count {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.sec-pill-manage {
+  border-style: dashed;
+  border-color: rgba(56, 189, 248, 0.42);
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.09);
+}
+
+.sec-pill-manage:hover {
+  border-style: solid;
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.2);
+  color: #ffffff;
+}
+
+/* --- 3) Sub-Filters & Tools Bar --- */
+.vault-sub-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.vault-sub-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.sub-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding-inline: 12px;
+  padding-block: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 179, 224, 0.18);
+  background: rgba(15, 24, 46, 0.6);
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.16s ease;
+}
+
+.sub-pill:hover {
+  color: var(--text-primary);
+  border-color: rgba(148, 179, 224, 0.36);
+}
+
+.sub-pill.is-active {
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 0 18px -3px rgba(56, 189, 248, 0.7);
+}
+
+.sub-pill-fav {
+  color: #fcd34d;
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+.sub-pill-fav.is-active {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  color: #1c1204;
+  border-color: transparent;
+  box-shadow: 0 0 22px -2px rgba(251, 191, 36, 0.78);
+}
+
+.vault-sub-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vault-sort-select {
+  width: auto;
+  min-height: 36px;
+  padding-inline: 12px;
+  padding-block: 5px;
+  font-size: 0.82rem;
+  border-radius: 11px;
+  background: rgba(15, 24, 46, 0.64);
+}
+
+/* --- 4) Full-Width Glass "+ Add New Item" Bar & Search --- */
+.vault-add-bar {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 18px;
+  border-radius: 15px;
+  border: 1px solid rgba(148, 186, 240, 0.24);
+  background: linear-gradient(135deg, rgba(30, 48, 88, 0.62) 0%, rgba(16, 26, 52, 0.68) 50%, rgba(36, 30, 74, 0.58) 100%);
+  backdrop-filter: var(--blur-lg);
+  -webkit-backdrop-filter: var(--blur-lg);
+  box-shadow: 0 10px 26px -12px rgba(2, 6, 23, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+  font-size: 0.94rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.18s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.vault-add-bar:hover {
+  transform: translateY(-1px);
+  border-color: rgba(56, 189, 248, 0.62);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.36) 0%, rgba(22, 36, 72, 0.78) 50%, rgba(139, 92, 246, 0.34) 100%);
+  box-shadow: 0 0 26px -6px rgba(56, 189, 248, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.vault-add-bar:active {
+  transform: scale(0.99);
+}
+
+.vault-search-input {
+  background: rgba(11, 18, 36, 0.66);
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+  border-color: rgba(148, 179, 224, 0.2);
+  border-radius: 14px;
+}
+
+/* --- 5) Responsive 3-Column Multi-Column Glass Cards Grid --- */
+.vault-cards-grid,
+.section-group-body.vault-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.section-group {
+  background: linear-gradient(160deg, rgba(16, 26, 50, 0.45) 0%, rgba(9, 15, 32, 0.42) 100%);
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+  border-color: var(--sec-border, rgba(148, 179, 224, 0.18));
+}
+
+.section-group-body.vault-cards-grid {
+  padding: 14px;
+}
+
+/* --- 6) Individual Creative Glass Card --- */
+.vault-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(155deg, rgba(22, 34, 64, 0.68) 0%, rgba(11, 18, 36, 0.64) 100%);
+  backdrop-filter: var(--blur-lg);
+  -webkit-backdrop-filter: var(--blur-lg);
+  border: 1px solid var(--sec-border, rgba(148, 179, 224, 0.22));
+  box-shadow: 0 14px 32px -16px rgba(2, 6, 23, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.22s ease;
+}
+
+.vault-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 85% 0%, rgba(56, 189, 248, 0.12), transparent 55%);
+  pointer-events: none;
+}
+
+.vault-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--sec-accent, rgba(56, 189, 248, 0.56));
+  box-shadow: 0 18px 36px -14px rgba(2, 6, 23, 0.82), 0 0 22px -8px var(--sec-accent, rgba(56, 189, 248, 0.42)), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* --- Radiant Glowing Favorite Card (Always Pinned at Top!) --- */
+.vault-card.is-pinned {
+  border: 1.5px solid rgba(251, 191, 36, 0.76);
+  background: linear-gradient(150deg, rgba(251, 191, 36, 0.16) 0%, rgba(245, 158, 11, 0.06) 38%, rgba(12, 19, 38, 0.74) 100%);
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.38),
+    0 0 28px -4px rgba(251, 191, 36, 0.58),
+    0 14px 30px -14px rgba(2, 6, 23, 0.8),
+    inset 0 1px 0 rgba(254, 240, 138, 0.45);
+}
+
+.vault-card.is-pinned::before {
+  background: radial-gradient(circle at 88% 4%, rgba(251, 191, 36, 0.28), transparent 58%);
+}
+
+.vault-card.is-pinned:hover {
+  border-color: #fbbf24;
+  box-shadow:
+    0 0 0 1.5px rgba(251, 191, 36, 0.55),
+    0 0 36px -2px rgba(251, 191, 36, 0.72),
+    0 18px 34px -14px rgba(2, 6, 23, 0.84),
+    inset 0 1px 0 rgba(254, 240, 138, 0.55);
+}
+
+.vault-card.is-selected {
+  border-color: #38bdf8;
+  background: linear-gradient(150deg, rgba(56, 189, 248, 0.22) 0%, rgba(15, 26, 54, 0.76) 100%);
+  box-shadow: 0 0 0 2px #38bdf8, 0 0 24px -4px rgba(56, 189, 248, 0.55);
+}
+
+.vault-card.is-selectable {
+  cursor: pointer;
+}
+
+/* Card Header Row */
+.vault-card-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vault-card-title-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 11px;
+  background: var(--sec-badge-bg, rgba(56, 189, 248, 0.14));
+  border: 1px solid var(--sec-border, rgba(56, 189, 248, 0.3));
+  border-inline-start: 3px solid var(--sec-accent, #38bdf8);
+  min-width: 0;
+  max-width: 56%;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.vault-card.is-pinned .vault-card-title-pill {
+  background: rgba(251, 191, 36, 0.18);
+  border-color: rgba(251, 191, 36, 0.48);
+  border-inline-start: 3px solid #fbbf24;
+  box-shadow: 0 0 14px -4px rgba(251, 191, 36, 0.45), inset 0 1px 0 rgba(254, 240, 138, 0.35);
+}
+
+.vault-card-emoji {
+  font-size: 0.9rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.vault-card-title-text {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vault-card.is-pinned .vault-card-title-text {
+  color: #fef3c7;
+}
+
+.vault-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.vault-mini-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 30px;
+  padding: 3px 7px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, text-shadow 0.15s ease;
+}
+
+.vault-mini-action:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(148, 179, 224, 0.24);
+}
+
+.vault-mini-action.is-fav {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.14);
+  border-color: rgba(251, 191, 36, 0.4);
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.8);
+}
+
+.vault-mini-action.is-fav:hover {
+  background: rgba(251, 191, 36, 0.24);
+  color: #fde68a;
+}
+
+.vault-mini-edit:hover {
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+/* Recessed Glass Field Rows inside Card */
+.vault-card-rows {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vault-field-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  background: rgba(4, 9, 22, 0.56);
+  border: 1px solid rgba(148, 179, 224, 0.15);
+  min-width: 0;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.vault-field-pill:hover {
+  border-color: rgba(125, 211, 252, 0.34);
+  background: rgba(7, 14, 34, 0.72);
+}
+
+.vault-card.is-pinned .vault-field-pill {
+  border-color: rgba(251, 191, 36, 0.22);
+  background: rgba(14, 12, 8, 0.45);
+}
+
+.vault-field-icon {
+  font-size: 0.88rem;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.92;
+}
+
+.vault-field-val {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.86rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.vault-pill-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.vault-pill-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.vault-pill-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.vault-pill-btn.is-revealed {
+  background: rgba(56, 189, 248, 0.24);
+  color: #7dd3fc;
+  border-color: rgba(56, 189, 248, 0.62);
+  box-shadow: 0 0 14px -2px rgba(56, 189, 248, 0.7);
+}
+
+/* --- Light Theme Creative Glass Adaptations --- */
+:root[data-theme="light"] .vault-kpi-card {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.84) 0%, rgba(241, 245, 249, 0.76) 100%);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 10px 26px -12px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+:root[data-theme="light"] .vault-kpi-value {
+  text-shadow: 0 0 14px rgba(2, 132, 199, 0.22);
+}
+
+:root[data-theme="light"] .sec-pill {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: var(--text-secondary);
+}
+
+:root[data-theme="light"] .sub-pill,
+:root[data-theme="light"] .vault-sort-select,
+:root[data-theme="light"] .vault-search-input {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+:root[data-theme="light"] .vault-add-bar {
+  background: linear-gradient(135deg, rgba(224, 242, 254, 0.88) 0%, rgba(255, 255, 255, 0.85) 50%, rgba(237, 233, 254, 0.85) 100%);
+  border-color: rgba(2, 132, 199, 0.28);
+  box-shadow: 0 8px 20px -10px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+:root[data-theme="light"] .section-group {
+  background: rgba(255, 255, 255, 0.56);
+}
+
+:root[data-theme="light"] .vault-card {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.86) 0%, rgba(248, 250, 252, 0.78) 100%);
+  border-color: var(--sec-border, rgba(15, 23, 42, 0.12));
+  box-shadow: 0 12px 28px -14px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+:root[data-theme="light"] .vault-card.is-pinned {
+  border-color: rgba(217, 119, 6, 0.75);
+  background: linear-gradient(150deg, rgba(254, 243, 199, 0.92) 0%, rgba(255, 251, 235, 0.86) 60%, rgba(255, 255, 255, 0.9) 100%);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.4), 0 0 26px -4px rgba(245, 158, 11, 0.45), 0 12px 26px -14px rgba(180, 83, 9, 0.2);
+}
+
+:root[data-theme="light"] .vault-card.is-pinned .vault-card-title-text {
+  color: #78350f;
+}
+
+:root[data-theme="light"] .vault-card.is-pinned .vault-mini-action.is-fav {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.22);
+  text-shadow: none;
+}
+
+:root[data-theme="light"] .vault-field-pill {
+  background: rgba(241, 245, 249, 0.88);
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+:root[data-theme="light"] .vault-pill-btn {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+/* --- Responsive Grid Breakpoints --- */
+@media (max-width: 1080px) {
+  .vault-cards-grid,
+  .section-group-body.vault-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .vault-kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .vault-kpi-card {
+    padding: 12px 10px;
+  }
+  .vault-kpi-value {
+    font-size: 1.55rem;
+  }
+  .vault-cards-grid,
+  .section-group-body.vault-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 11px;
+  }
+  .section-group-body.vault-cards-grid {
+    padding: 10px;
+  }
+  .vault-mini-action span {
+    display: none;
+  }
+  .vault-mini-action.is-fav span {
+    display: inline;
+  }
+  .vault-card-title-pill {
+    max-width: 60%;
+  }
+}
+
+/* --- Compact Overrides for Chrome Extension Popup & Android Overlay --- */
+html.chrome-popup-mode .vault-kpi-strip,
+html.overlay-mode .vault-kpi-strip {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+html.chrome-popup-mode .vault-kpi-card,
+html.overlay-mode .vault-kpi-card {
+  padding: 10px 8px;
+  border-radius: 14px;
+}
+
+html.chrome-popup-mode .vault-kpi-value,
+html.overlay-mode .vault-kpi-value {
+  font-size: 1.35rem;
+}
+
+html.chrome-popup-mode .vault-cards-grid,
+html.chrome-popup-mode .section-group-body.vault-cards-grid,
+html.overlay-mode .vault-cards-grid,
+html.overlay-mode .section-group-body.vault-cards-grid {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+html.chrome-popup-mode .vault-mini-action span,
+html.overlay-mode .vault-mini-action span {
+  display: none;
+}
+
+html.chrome-popup-mode .vault-mini-action.is-fav span,
+html.overlay-mode .vault-mini-action.is-fav span {
+  display: inline;
 }
