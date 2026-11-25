@@ -4554,7 +4554,14 @@
       addOptionalPasswordBtn: "\u0625\u0636\u0627\u0641\u0629 \u0643\u0644\u0645\u0629 \u0645\u0631\u0648\u0631 \u0625\u0636\u0627\u0641\u064A\u0629",
       privacyBlurLabel: "\u0625\u062E\u0641\u0627\u0621 \u0627\u0644\u0634\u0627\u0634\u0629 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B \u0639\u0646\u062F \u0645\u063A\u0627\u062F\u0631\u0629 \u0627\u0644\u0646\u0627\u0641\u0630\u0629 (\u064A\u0639\u064A\u0642 \u0644\u0642\u0637\u0627\u062A \u0627\u0644\u0634\u0627\u0634\u0629 \u0641\u064A \u0627\u0644\u0645\u062A\u0635\u0641\u062D)",
       copyNumberShort: "\u0646\u0633\u062E \u0627\u0644\u0631\u0642\u0645",
-      syncLockMethodHint: "\u0627\u0633\u062A\u062E\u062F\u0645 \u0646\u0641\u0633 \u0627\u0644\u0646\u0645\u0637 \u0623\u0648 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0645\u0648\u062C\u0648\u062F\u0629 \u0641\u064A \u062E\u0632\u0646\u062A\u0643 \u062D\u062A\u0649 \u062A\u062A\u0637\u0627\u0628\u0642 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u0628\u0633\u0647\u0648\u0644\u0629 \u0628\u064A\u0646 \u0627\u0644\u062C\u0647\u0627\u0632\u064A\u0646."
+      syncLockMethodHint: "\u0627\u0633\u062A\u062E\u062F\u0645 \u0646\u0641\u0633 \u0627\u0644\u0646\u0645\u0637 \u0623\u0648 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0645\u0648\u062C\u0648\u062F\u0629 \u0641\u064A \u062E\u0632\u0646\u062A\u0643 \u062D\u062A\u0649 \u062A\u062A\u0637\u0627\u0628\u0642 \u0627\u0644\u0645\u0632\u0627\u0645\u0646\u0629 \u0628\u0633\u0647\u0648\u0644\u0629 \u0628\u064A\u0646 \u0627\u0644\u062C\u0647\u0627\u0632\u064A\u0646.",
+      manageSectionsBtn: "\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0623\u0642\u0633\u0627\u0645",
+      multiSelectBtn: "\u062A\u062D\u062F\u064A\u062F \u0648\u0646\u0642\u0644",
+      selectAllBtn: "\u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0643\u0644",
+      deselectAllBtn: "\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u0643\u0644",
+      createAndMovePlaceholder: "\u0627\u0633\u0645 \u0642\u0633\u0645 \u062C\u062F\u064A\u062F \u0644\u0644\u0646\u0642\u0644 \u0625\u0644\u064A\u0647...",
+      createAndMoveBtn: "\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0642\u0633\u0645 \u0648\u0627\u0644\u0646\u0642\u0644 \u0625\u0644\u064A\u0647",
+      sectionNamePlaceholder: "\u0627\u0643\u062A\u0628 \u0627\u0633\u0645 \u0627\u0644\u0642\u0633\u0645 \u0627\u0644\u062C\u062F\u064A\u062F..."
     },
     en: {
       appName: "Khazna",
@@ -4817,7 +4824,14 @@
       addOptionalPasswordBtn: "Add Optional Password",
       privacyBlurLabel: "Blur screen automatically when window loses focus (blocks browser screenshots)",
       copyNumberShort: "Copy Number",
-      syncLockMethodHint: "Use the same Pattern or Password as your vault so both devices share the exact same lock for easy syncing."
+      syncLockMethodHint: "Use the same Pattern or Password as your vault so both devices share the exact same lock for easy syncing.",
+      manageSectionsBtn: "Manage Sections",
+      multiSelectBtn: "Select & Move",
+      selectAllBtn: "Select All",
+      deselectAllBtn: "Clear All",
+      createAndMovePlaceholder: "New section name to move into...",
+      createAndMoveBtn: "Create Section & Move",
+      sectionNamePlaceholder: "Enter new section name..."
     }
   };
   function t(lang, key) {
@@ -8998,13 +9012,45 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       )
     );
     container.appendChild(strip);
+    const sourceList = state.showTrash ? trashedPasswords : passwords;
+    const visibleEntries = filterAndSortPasswords(sourceList, {
+      query: state.query,
+      sectionId: state.showTrash ? "all" : state.sectionId,
+      favoritesOnly: !state.showTrash && state.favoritesOnly,
+      duplicatesOnly: !state.showTrash && state.duplicatesOnly,
+      sortBy: state.sortBy
+    });
     const selectedIds = state.selectedIds || /* @__PURE__ */ new Set();
-    if (selectedIds.size > 0) {
+    const isSelecting = Boolean(state.selectMode) || selectedIds.size > 0;
+    if (isSelecting && !state.showTrash) {
+      const allVisibleSelected = visibleEntries.length > 0 && visibleEntries.every((e) => selectedIds.has(e.id));
       container.appendChild(
         el(
           "div",
           { class: "multiselect-bar" },
-          el("strong", null, `${selectedIds.size} ${t(lang, "multiSelectCount")}`),
+          el(
+            "div",
+            { class: "toolbar-row" },
+            el(
+              "button",
+              {
+                type: "button",
+                class: "btn btn-sm",
+                onClick: () => {
+                  if (allVisibleSelected) {
+                    onStateChange({ selectMode: true, selectedIds: /* @__PURE__ */ new Set() });
+                  } else {
+                    onStateChange({
+                      selectMode: true,
+                      selectedIds: new Set(visibleEntries.map((e) => e.id))
+                    });
+                  }
+                }
+              },
+              allVisibleSelected ? t(lang, "deselectAllBtn") : t(lang, "selectAllBtn")
+            ),
+            el("strong", null, `${selectedIds.size} ${t(lang, "multiSelectCount")}`)
+          ),
           el(
             "div",
             { class: "toolbar-row" },
@@ -9013,8 +9059,16 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
               {
                 type: "button",
                 class: "btn btn-sm btn-primary",
+                disabled: selectedIds.size === 0,
                 onClick: () => {
-                  openBulkMoveSheet({ session: session2, lang, selectedIds, sections: sortedSections, onStateChange, onRefresh });
+                  openBulkMoveSheet({
+                    session: session2,
+                    lang,
+                    selectedIds,
+                    sections: sortedSections,
+                    onStateChange,
+                    onRefresh
+                  });
                 }
               },
               svgIcon("link", 14),
@@ -9025,11 +9079,12 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
               {
                 type: "button",
                 class: "btn btn-sm btn-danger",
+                disabled: selectedIds.size === 0,
                 onClick: async () => {
                   for (const id of selectedIds) {
                     await session2.trashRecord(id);
                   }
-                  onStateChange({ selectedIds: /* @__PURE__ */ new Set() });
+                  onStateChange({ selectMode: false, selectedIds: /* @__PURE__ */ new Set() });
                   await onRefresh();
                 }
               },
@@ -9041,7 +9096,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
               {
                 type: "button",
                 class: "btn btn-sm",
-                onClick: () => onStateChange({ selectedIds: /* @__PURE__ */ new Set() })
+                onClick: () => onStateChange({ selectMode: false, selectedIds: /* @__PURE__ */ new Set() })
               },
               t(lang, "cancelSelection")
             )
@@ -9049,16 +9104,36 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
         )
       );
     } else {
-      container.appendChild(el("div", { class: "toolbar-row" }, sortSelect));
+      container.appendChild(
+        el(
+          "div",
+          { class: "pw-controls-bar" },
+          el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-sm",
+              "data-testid": "manage-sections-btn",
+              onClick: () => openManageSectionsSheet({ session: session2, lang, sections: sortedSections, passwords, onRefresh })
+            },
+            svgIcon("plus", 15),
+            t(lang, "manageSectionsBtn")
+          ),
+          !state.showTrash && visibleEntries.length > 0 ? el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-sm",
+              "data-testid": "multi-select-btn",
+              onClick: () => onStateChange({ selectMode: true, selectedIds: /* @__PURE__ */ new Set() })
+            },
+            svgIcon("check", 15),
+            t(lang, "multiSelectBtn")
+          ) : null,
+          sortSelect
+        )
+      );
     }
-    const sourceList = state.showTrash ? trashedPasswords : passwords;
-    const visibleEntries = filterAndSortPasswords(sourceList, {
-      query: state.query,
-      sectionId: state.showTrash ? "all" : state.sectionId,
-      favoritesOnly: !state.showTrash && state.favoritesOnly,
-      duplicatesOnly: !state.showTrash && state.duplicatesOnly,
-      sortBy: state.sortBy
-    });
     if (!state.showTrash && !state.favoritesOnly && !state.duplicatesOnly && state.sectionId !== "all") {
       const activeSec = sectionById.get(state.sectionId);
       if (activeSec) {
@@ -9257,30 +9332,50 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     const sec = sectionById.get(d.sectionId);
     const accentCls = accentClassForHex(sec?.data?.color);
     const isSelected = selectedIds.has(entry.id);
+    const isSelecting = (Boolean(state.selectMode) || selectedIds.size > 0) && !state.showTrash;
+    const toggleThisSelection = () => {
+      const next = new Set(selectedIds);
+      if (next.has(entry.id)) next.delete(entry.id);
+      else next.add(entry.id);
+      onStateChange({ selectMode: true, selectedIds: next });
+    };
     const card = el("article", {
-      class: `entry-card stagger-item ${accentCls} ${isSelected ? "is-selected" : ""}`.trim(),
+      class: `entry-card stagger-item ${accentCls} ${isSelected ? "is-selected" : ""} ${isSelecting ? "is-selectable" : ""}`.trim(),
       "data-entry-id": entry.id
     });
-    let longPressTimer = null;
-    card.addEventListener("pointerdown", (e) => {
-      if (e.target.closest("button, input, a")) return;
-      longPressTimer = setTimeout(() => {
-        triggerHaptic(24);
-        const next = new Set(selectedIds);
-        if (next.has(entry.id)) next.delete(entry.id);
-        else next.add(entry.id);
-        onStateChange({ selectedIds: next });
-      }, 500);
-    });
-    const cancelLongPress = () => {
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-      }
-    };
-    card.addEventListener("pointerup", cancelLongPress);
-    card.addEventListener("pointercancel", cancelLongPress);
-    card.addEventListener("pointermove", cancelLongPress);
+    if (isSelecting) {
+      card.addEventListener("click", (e) => {
+        if (e.target.closest('input[type="checkbox"]')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        toggleThisSelection();
+      });
+    } else {
+      let longPressTimer = null;
+      card.addEventListener("pointerdown", (e) => {
+        if (e.target.closest("button, input, a")) return;
+        longPressTimer = setTimeout(() => {
+          triggerHaptic(24);
+          toggleThisSelection();
+        }, 500);
+      });
+      const cancelLongPress = () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      };
+      card.addEventListener("pointerup", cancelLongPress);
+      card.addEventListener("pointercancel", cancelLongPress);
+      card.addEventListener("pointermove", cancelLongPress);
+    }
+    const selectCheckbox = isSelecting ? el("input", {
+      type: "checkbox",
+      class: "entry-select-cb",
+      checked: isSelected,
+      "aria-label": d.title || "Select",
+      onChange: () => toggleThisSelection()
+    }) : null;
     const favBtn = el(
       "button",
       {
@@ -9333,6 +9428,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     const topRow = el(
       "div",
       { class: "entry-top entry-top-simple" },
+      selectCheckbox,
       el(
         "div",
         { class: "entry-title-group" },
@@ -9344,7 +9440,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
         ),
         d.username ? el("p", { class: "entry-sub ltr-value" }, d.username) : null
       ),
-      !state.showTrash ? el("div", { class: "entry-mini-icons" }, favBtn, moveIconBtn, editIconBtn) : null
+      !state.showTrash && !isSelecting ? el("div", { class: "entry-mini-icons" }, favBtn, moveIconBtn, editIconBtn) : null
     );
     const actionsRow = el("div", { class: "entry-copy-row" });
     if (state.showTrash) {
@@ -9410,7 +9506,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     }
     card.classList.add("entry-card-simple");
     card.appendChild(topRow);
-    if (actionsRow.childNodes.length > 0) {
+    if (!isSelecting && actionsRow.childNodes.length > 0) {
       card.appendChild(actionsRow);
     }
     return card;
@@ -9418,6 +9514,21 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
   function openMoveEntrySheet({ session: session2, lang, entry, sections, onRefresh }) {
     const currentSecId = entry?.data?.sectionId;
     const list = el("div", { class: "settings-group" });
+    const moveTo = async (targetSectionId) => {
+      await session2.saveRecord({
+        id: entry.id,
+        type: "password",
+        createdAt: entry.createdAt,
+        data: {
+          ...entry.data,
+          sectionId: targetSectionId
+        }
+      });
+      sheet.close();
+      triggerHaptic();
+      showToast(`${t(lang, "save")} \u2713`, "success");
+      await onRefresh();
+    };
     for (const s of sections) {
       const isCurrent = s.id === currentSecId;
       const accentCls = accentClassForHex(s.data?.color);
@@ -9428,21 +9539,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
             type: "button",
             class: `btn btn-block ${accentCls} ${isCurrent ? "is-active" : ""}`.trim(),
             disabled: isCurrent,
-            onClick: async () => {
-              await session2.saveRecord({
-                id: entry.id,
-                type: "password",
-                createdAt: entry.createdAt,
-                data: {
-                  ...entry.data,
-                  sectionId: s.id
-                }
-              });
-              sheet.close();
-              triggerHaptic();
-              showToast(`${t(lang, "save")} \u2713`, "success");
-              await onRefresh();
-            }
+            onClick: () => moveTo(s.id)
           },
           el("span", null, s.data?.emoji || "\u{1F4C1}"),
           el("span", null, s.data?.name || ""),
@@ -9450,6 +9547,36 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
         )
       );
     }
+    const newSecIn = el("input", {
+      type: "text",
+      class: "input",
+      placeholder: t(lang, "createAndMovePlaceholder"),
+      autocomplete: "off"
+    });
+    const quickCreateForm = el(
+      "form",
+      {
+        class: "glass-card glass-card-compact settings-group",
+        onSubmit: async (e) => {
+          e.preventDefault();
+          const name = newSecIn.value.trim();
+          if (!name) return;
+          const created = await session2.saveRecord({
+            type: "section",
+            data: {
+              name,
+              emoji: "\u{1F4C1}",
+              color: SECTION_COLOR_OPTIONS[sections.length % SECTION_COLOR_OPTIONS.length].hex,
+              order: sections.length
+            }
+          });
+          await moveTo(created.id);
+        }
+      },
+      newSecIn,
+      el("button", { type: "submit", class: "btn btn-sm btn-primary btn-block" }, svgIcon("plus", 15), t(lang, "createAndMoveBtn"))
+    );
+    list.appendChild(quickCreateForm);
     const sheet = openBottomSheet({
       title: t(lang, "moveToSection"),
       content: list
@@ -9457,6 +9584,14 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
   }
   function openBulkMoveSheet({ session: session2, lang, selectedIds, sections, onStateChange, onRefresh }) {
     const list = el("div", { class: "settings-group" });
+    const moveAllTo = async (targetSectionId) => {
+      await session2.movePasswordsToSection(selectedIds, targetSectionId);
+      sheet.close();
+      triggerHaptic();
+      onStateChange({ selectMode: false, selectedIds: /* @__PURE__ */ new Set() });
+      showToast(`${t(lang, "save")} \u2713`, "success");
+      await onRefresh();
+    };
     for (const s of sections) {
       const accentCls = accentClassForHex(s.data?.color);
       list.appendChild(
@@ -9465,20 +9600,43 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
           {
             type: "button",
             class: `btn btn-block ${accentCls}`.trim(),
-            onClick: async () => {
-              await session2.movePasswordsToSection(selectedIds, s.id);
-              sheet.close();
-              triggerHaptic();
-              onStateChange({ selectedIds: /* @__PURE__ */ new Set() });
-              showToast(`${t(lang, "save")} \u2713`, "success");
-              await onRefresh();
-            }
+            onClick: () => moveAllTo(s.id)
           },
           el("span", null, s.data?.emoji || "\u{1F4C1}"),
           el("span", null, s.data?.name || "")
         )
       );
     }
+    const newSecIn = el("input", {
+      type: "text",
+      class: "input",
+      placeholder: t(lang, "createAndMovePlaceholder"),
+      autocomplete: "off"
+    });
+    const quickCreateForm = el(
+      "form",
+      {
+        class: "glass-card glass-card-compact settings-group",
+        onSubmit: async (e) => {
+          e.preventDefault();
+          const name = newSecIn.value.trim();
+          if (!name) return;
+          const created = await session2.saveRecord({
+            type: "section",
+            data: {
+              name,
+              emoji: "\u{1F4C1}",
+              color: SECTION_COLOR_OPTIONS[sections.length % SECTION_COLOR_OPTIONS.length].hex,
+              order: sections.length
+            }
+          });
+          await moveAllTo(created.id);
+        }
+      },
+      newSecIn,
+      el("button", { type: "submit", class: "btn btn-sm btn-primary btn-block" }, svgIcon("plus", 15), t(lang, "createAndMoveBtn"))
+    );
+    list.appendChild(quickCreateForm);
     const sheet = openBottomSheet({
       title: `${t(lang, "moveToSection")} (${selectedIds.size})`,
       content: list
@@ -9633,10 +9791,23 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     });
   }
   function openManageSectionsSheet({ session: session2, lang, sections, passwords, onRefresh }) {
+    let currentSections = [...sections];
     const host = el("div", { class: "settings-group" });
+    const reloadLocal = async () => {
+      const fresh = await session2.listRecords("section");
+      currentSections = fresh.sort((a, b) => (a.data?.order ?? 0) - (b.data?.order ?? 0));
+      await onRefresh();
+      renderList();
+    };
     const renderList = () => {
       while (host.firstChild) host.removeChild(host.firstChild);
-      const nameIn = el("input", { type: "text", class: "input", placeholder: t(lang, "addSection"), required: true, autocomplete: "off" });
+      const nameIn = el("input", {
+        type: "text",
+        class: "input",
+        placeholder: t(lang, "sectionNamePlaceholder"),
+        required: true,
+        autocomplete: "off"
+      });
       const emojiSel = el(
         "select",
         { class: "select", "aria-label": "Emoji" },
@@ -9657,10 +9828,10 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
             if (!name) return;
             await session2.saveRecord({
               type: "section",
-              data: { name, emoji: emojiSel.value, color: colorSel.value, order: sections.length }
+              data: { name, emoji: emojiSel.value, color: colorSel.value, order: currentSections.length }
             });
-            sheet.close();
-            await onRefresh();
+            showToast(`${t(lang, "addSection")} \u2713`, "success");
+            await reloadLocal();
           }
         },
         nameIn,
@@ -9668,7 +9839,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
         el("button", { type: "submit", class: "btn btn-primary btn-block" }, svgIcon("plus", 16), t(lang, "addSection"))
       );
       host.appendChild(addForm);
-      sections.forEach((sec, idx) => {
+      currentSections.forEach((sec, idx) => {
         const d = sec.data || {};
         const itemCount = passwords.filter((p) => p.data?.sectionId === sec.id).length;
         const renameIn = el("input", { type: "text", class: "input", value: d.name || "", "aria-label": d.name || "Section" });
@@ -9702,9 +9873,8 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
                   color: editColorSel.value
                 }
               });
-              sheet.close();
-              showToast(t(lang, "save"), "success");
-              await onRefresh();
+              showToast(`${t(lang, "save")} \u2713`, "success");
+              await reloadLocal();
             }
           },
           t(lang, "save")
@@ -9717,27 +9887,43 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
             disabled: idx === 0,
             "aria-label": "Move up",
             onClick: async () => {
-              const prev = sections[idx - 1];
+              const prev = currentSections[idx - 1];
               await session2.saveRecord({ id: sec.id, type: "section", createdAt: sec.createdAt, data: { ...d, order: idx - 1 } });
               await session2.saveRecord({ id: prev.id, type: "section", createdAt: prev.createdAt, data: { ...prev.data, order: idx } });
-              sheet.close();
-              await onRefresh();
+              await reloadLocal();
             }
           },
           "\u2191"
+        );
+        const moveDownBtn = el(
+          "button",
+          {
+            type: "button",
+            class: "btn btn-sm",
+            disabled: idx === currentSections.length - 1,
+            "aria-label": "Move down",
+            onClick: async () => {
+              const next = currentSections[idx + 1];
+              await session2.saveRecord({ id: sec.id, type: "section", createdAt: sec.createdAt, data: { ...d, order: idx + 1 } });
+              await session2.saveRecord({ id: next.id, type: "section", createdAt: next.createdAt, data: { ...next.data, order: idx } });
+              await reloadLocal();
+            }
+          },
+          "\u2193"
         );
         const delBtn = el(
           "button",
           {
             type: "button",
             class: "btn btn-sm btn-danger",
-            disabled: sections.length <= 1,
+            "aria-label": `${t(lang, "delete")} ${d.name || ""}`,
             onClick: () => {
               sheet.close();
-              openDeleteSectionSheet({ session: session2, lang, section: sec, allSections: sections, passwords, onRefresh });
+              openDeleteSectionSheet({ session: session2, lang, section: sec, allSections: currentSections, passwords, onRefresh });
             }
           },
-          svgIcon("trash", 14)
+          svgIcon("trash", 14),
+          t(lang, "delete")
         );
         host.appendChild(
           el(
@@ -9750,6 +9936,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
               { class: "toolbar-row" },
               el("span", { class: "settings-row-desc" }, `${itemCount} ${t(lang, "navPasswords")}`),
               moveUpBtn,
+              moveDownBtn,
               delBtn
             )
           )
@@ -9757,7 +9944,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       });
     };
     renderList();
-    const sheet = openBottomSheet({ title: t(lang, "manageSections"), content: host });
+    const sheet = openBottomSheet({ title: t(lang, "manageSectionsBtn"), content: host });
   }
   function openDeleteSectionSheet({ session: session2, lang, section, allSections, passwords, onRefresh }) {
     const others = allSections.filter((s) => s.id !== section.id);
@@ -10153,7 +10340,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
         "div",
         { class: "settings-row" },
         el("span", { class: "settings-row-title" }, t(lang, "appVersionLabel")),
-        el("span", { class: "settings-row-desc ltr-inline mono" }, `v${integrityInfo?.version || "2.3.0"} \u2022 ${kdfInfo}`)
+        el("span", { class: "settings-row-desc ltr-inline mono" }, `v${integrityInfo?.version || "2.4.0"} \u2022 ${kdfInfo}`)
       )
     );
     pwaCard.appendChild(
@@ -11941,7 +12128,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
   }
 
   // src/main.js
-  var APP_VERSION = "2.3.1";
+  var APP_VERSION = "2.4.0";
   function isCapacitorAndroid() {
     return typeof window !== "undefined" && typeof window.Capacitor !== "undefined" && window.Capacitor?.isNativePlatform?.() === true && window.Capacitor?.getPlatform?.() === "android";
   }
@@ -11976,6 +12163,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       duplicatesOnly: false,
       showTrash: false,
       sortBy: "updated-desc",
+      selectMode: false,
       selectedIds: /* @__PURE__ */ new Set()
     },
     notesQuery: "",

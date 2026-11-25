@@ -265,6 +265,13 @@ const DICT = {
     privacyBlurLabel: 'إخفاء الشاشة تلقائياً عند مغادرة النافذة (يعيق لقطات الشاشة في المتصفح)',
     copyNumberShort: 'نسخ الرقم',
     syncLockMethodHint: 'استخدم نفس النمط أو كلمة المرور الموجودة في خزنتك حتى تتطابق المزامنة بسهولة بين الجهازين.',
+    manageSectionsBtn: 'إدارة الأقسام',
+    multiSelectBtn: 'تحديد ونقل',
+    selectAllBtn: 'تحديد الكل',
+    deselectAllBtn: 'إلغاء الكل',
+    createAndMovePlaceholder: 'اسم قسم جديد للنقل إليه...',
+    createAndMoveBtn: 'إنشاء القسم والنقل إليه',
+    sectionNamePlaceholder: 'اكتب اسم القسم الجديد...',
   },
   en: {
     appName: 'Khazna',
@@ -528,6 +535,13 @@ const DICT = {
     privacyBlurLabel: 'Blur screen automatically when window loses focus (blocks browser screenshots)',
     copyNumberShort: 'Copy Number',
     syncLockMethodHint: 'Use the same Pattern or Password as your vault so both devices share the exact same lock for easy syncing.',
+    manageSectionsBtn: 'Manage Sections',
+    multiSelectBtn: 'Select & Move',
+    selectAllBtn: 'Select All',
+    deselectAllBtn: 'Clear All',
+    createAndMovePlaceholder: 'New section name to move into...',
+    createAndMoveBtn: 'Create Section & Move',
+    sectionNamePlaceholder: 'Enter new section name...',
   },
 };
 

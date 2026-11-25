@@ -1941,6 +1941,33 @@ html.chrome-popup-mode .pattern-svg {
   gap: 10px;
 }
 
+.entry-card.is-selectable {
+  cursor: pointer;
+}
+
+.entry-select-cb {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.pw-controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pw-controls-bar .select {
+  width: auto;
+  min-height: 38px;
+  padding-block: 6px;
+  font-size: 0.85rem;
+  flex: 1 1 130px;
+}
+
 .entry-top-simple {
   align-items: center;
 }

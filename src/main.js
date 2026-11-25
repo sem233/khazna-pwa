@@ -17,7 +17,7 @@ import { renderStatsView } from './ui/stats-view.js';
 import { openSyncSheet } from './ui/sync-sheet.js';
 import { renderUnlockView } from './ui/unlock-view.js';
 
-const APP_VERSION = '2.3.1';
+const APP_VERSION = '2.4.0';
 
 /**
  * Returns true when running inside a real Capacitor Android app.
@@ -66,6 +66,7 @@ const appState = {
     duplicatesOnly: false,
     showTrash: false,
     sortBy: 'updated-desc',
+    selectMode: false,
     selectedIds: new Set(),
   },
   notesQuery: '',
