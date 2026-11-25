@@ -280,6 +280,13 @@ const DICT = {
     usernameOrBillLabel: 'اسم المستخدم / البريد / رقم الفاتورة',
     revealToggle: 'إظهار / إخفاء كلمة المرور',
     moveShort: 'نقل',
+    dupReasonUser: 'نفس المستخدم/الرقم',
+    dupReasonPass: 'نفس كلمة المرور',
+    dupReasonTitle: 'نفس العنوان',
+    dupBannerSection: 'العناصر المكررة داخل هذا القسم — يمكنك حذف الزائد مباشرة من زر الحذف',
+    dupBannerAll: 'العناصر المكررة فعلياً داخل كل قسم على حدة — يمكنك تنظيفها مباشرة',
+    dupNoneInSection: 'لا توجد عناصر مكررة في هذا القسم ✓',
+    movedToTrashToast: 'تم النقل للمحذوفات',
   },
   en: {
     appName: 'Khazna',
@@ -558,6 +565,13 @@ const DICT = {
     usernameOrBillLabel: 'Username / Email / Bill Number',
     revealToggle: 'Show / Hide Password',
     moveShort: 'Move',
+    dupReasonUser: 'Same User/Number',
+    dupReasonPass: 'Same Password',
+    dupReasonTitle: 'Same Title',
+    dupBannerSection: 'Duplicates inside this section — remove extras directly with Delete',
+    dupBannerAll: 'Actual per-section duplicates grouped by section — clean them directly',
+    dupNoneInSection: 'No duplicates in this section ✓',
+    movedToTrashToast: 'Moved to Trash',
   },
 };
 

@@ -4570,7 +4570,14 @@
       passwordOptionalLabel: "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 (\u0627\u062E\u062A\u064A\u0627\u0631\u064A \u2014 \u063A\u064A\u0631 \u0645\u0637\u0644\u0648\u0628\u0629 \u0644\u0644\u0641\u0648\u0627\u062A\u064A\u0631)",
       usernameOrBillLabel: "\u0627\u0633\u0645 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 / \u0627\u0644\u0628\u0631\u064A\u062F / \u0631\u0642\u0645 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629",
       revealToggle: "\u0625\u0638\u0647\u0627\u0631 / \u0625\u062E\u0641\u0627\u0621 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631",
-      moveShort: "\u0646\u0642\u0644"
+      moveShort: "\u0646\u0642\u0644",
+      dupReasonUser: "\u0646\u0641\u0633 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645/\u0627\u0644\u0631\u0642\u0645",
+      dupReasonPass: "\u0646\u0641\u0633 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631",
+      dupReasonTitle: "\u0646\u0641\u0633 \u0627\u0644\u0639\u0646\u0648\u0627\u0646",
+      dupBannerSection: "\u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u0643\u0631\u0631\u0629 \u062F\u0627\u062E\u0644 \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0645 \u2014 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u0627\u0644\u0632\u0627\u0626\u062F \u0645\u0628\u0627\u0634\u0631\u0629 \u0645\u0646 \u0632\u0631 \u0627\u0644\u062D\u0630\u0641",
+      dupBannerAll: "\u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u0643\u0631\u0631\u0629 \u0641\u0639\u0644\u064A\u0627\u064B \u062F\u0627\u062E\u0644 \u0643\u0644 \u0642\u0633\u0645 \u0639\u0644\u0649 \u062D\u062F\u0629 \u2014 \u064A\u0645\u0643\u0646\u0643 \u062A\u0646\u0638\u064A\u0641\u0647\u0627 \u0645\u0628\u0627\u0634\u0631\u0629",
+      dupNoneInSection: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0639\u0646\u0627\u0635\u0631 \u0645\u0643\u0631\u0631\u0629 \u0641\u064A \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0645 \u2713",
+      movedToTrashToast: "\u062A\u0645 \u0627\u0644\u0646\u0642\u0644 \u0644\u0644\u0645\u062D\u0630\u0648\u0641\u0627\u062A"
     },
     en: {
       appName: "Khazna",
@@ -4848,7 +4855,14 @@
       passwordOptionalLabel: "Password (Optional \u2014 not needed for Bills)",
       usernameOrBillLabel: "Username / Email / Bill Number",
       revealToggle: "Show / Hide Password",
-      moveShort: "Move"
+      moveShort: "Move",
+      dupReasonUser: "Same User/Number",
+      dupReasonPass: "Same Password",
+      dupReasonTitle: "Same Title",
+      dupBannerSection: "Duplicates inside this section \u2014 remove extras directly with Delete",
+      dupBannerAll: "Actual per-section duplicates grouped by section \u2014 clean them directly",
+      dupNoneInSection: "No duplicates in this section \u2713",
+      movedToTrashToast: "Moved to Trash"
     }
   };
   function t(lang, key) {
@@ -5828,19 +5842,42 @@
     ["#f472b6", "accent-rose"],
     ["#2dd4bf", "accent-teal"],
     ["#fb7185", "accent-coral"],
+    ["#818cf8", "accent-indigo"],
+    ["#a3e635", "accent-lime"],
+    ["#e879f9", "accent-fuchsia"],
+    ["#22d3ee", "accent-cyan"],
+    ["#fb923c", "accent-orange"],
     ["#94a3b8", "accent-slate"]
   ]);
   var SECTION_COLOR_OPTIONS = Object.freeze([
-    { hex: "#38bdf8", cls: "accent-sky", nameAr: "\u0633\u0645\u0627\u0648\u064A", nameEn: "Sky" },
+    { hex: "#38bdf8", cls: "accent-sky", nameAr: "\u0633\u0645\u0627\u0648\u064A \u0645\u0634\u0639", nameEn: "Electric Sky" },
     { hex: "#10b981", cls: "accent-emerald", nameAr: "\u0632\u0645\u0631\u062F\u064A", nameEn: "Emerald" },
-    { hex: "#a78bfa", cls: "accent-violet", nameAr: "\u0628\u0646\u0641\u0633\u062C\u064A", nameEn: "Violet" },
-    { hex: "#f59e0b", cls: "accent-amber", nameAr: "\u0643\u0647\u0631\u0645\u0627\u0646\u064A", nameEn: "Amber" },
-    { hex: "#f472b6", cls: "accent-rose", nameAr: "\u0648\u0631\u062F\u064A", nameEn: "Rose" },
-    { hex: "#2dd4bf", cls: "accent-teal", nameAr: "\u0641\u064A\u0631\u0648\u0632\u064A", nameEn: "Teal" },
-    { hex: "#fb7185", cls: "accent-coral", nameAr: "\u0645\u0631\u062C\u0627\u0646\u064A", nameEn: "Coral" }
+    { hex: "#a78bfa", cls: "accent-violet", nameAr: "\u0628\u0646\u0641\u0633\u062C\u064A \u0645\u0644\u0643\u064A", nameEn: "Royal Violet" },
+    { hex: "#2dd4bf", cls: "accent-teal", nameAr: "\u0641\u064A\u0631\u0648\u0632\u064A", nameEn: "Ocean Teal" },
+    { hex: "#f59e0b", cls: "accent-amber", nameAr: "\u0643\u0647\u0631\u0645\u0627\u0646\u064A \u0630\u0647\u0628\u064A", nameEn: "Golden Amber" },
+    { hex: "#f472b6", cls: "accent-rose", nameAr: "\u0648\u0631\u062F\u064A \u0646\u064A\u0648\u0646", nameEn: "Neon Rose" },
+    { hex: "#fb7185", cls: "accent-coral", nameAr: "\u0645\u0631\u062C\u0627\u0646\u064A", nameEn: "Coral Glow" },
+    { hex: "#818cf8", cls: "accent-indigo", nameAr: "\u0646\u064A\u0644\u064A \u0639\u0645\u064A\u0642", nameEn: "Deep Indigo" },
+    { hex: "#a3e635", cls: "accent-lime", nameAr: "\u0644\u064A\u0645\u0648\u0646\u064A", nameEn: "Vibrant Lime" },
+    { hex: "#e879f9", cls: "accent-fuchsia", nameAr: "\u0623\u0631\u062C\u0648\u0627\u0646\u064A", nameEn: "Fuchsia" },
+    { hex: "#22d3ee", cls: "accent-cyan", nameAr: "\u0633\u0645\u0627\u0648\u064A \u062C\u0644\u064A\u062F\u064A", nameEn: "Ice Cyan" },
+    { hex: "#fb923c", cls: "accent-orange", nameAr: "\u0628\u0631\u062A\u0642\u0627\u0644\u064A \u062F\u0627\u0641\u0626", nameEn: "Sunset Orange" }
   ]);
   function accentClassForHex(hex) {
     return ACCENT_MAP.get(String(hex || "").toLowerCase()) || "accent-sky";
+  }
+  function pickNextUnusedSectionTheme(existingSections = [], emojiPool = []) {
+    const usedColors = new Set(
+      existingSections.map((s) => String(s?.data?.color || "").toLowerCase()).filter(Boolean)
+    );
+    const usedEmojis = new Set(
+      existingSections.map((s) => String(s?.data?.emoji || "")).filter(Boolean)
+    );
+    const unusedColor = SECTION_COLOR_OPTIONS.find((c) => !usedColors.has(c.hex));
+    const colorObj = unusedColor || SECTION_COLOR_OPTIONS[existingSections.length % SECTION_COLOR_OPTIONS.length];
+    const unusedEmoji = emojiPool.find((em) => !usedEmojis.has(em));
+    const emoji = unusedEmoji || (emojiPool.length > 0 ? emojiPool[existingSections.length % emojiPool.length] : "\u{1F4C1}");
+    return { hex: colorObj.hex, cls: colorObj.cls, emoji };
   }
   function el(tag, attrs = null, ...children) {
     const node = document.createElement(tag);
@@ -7700,15 +7737,12 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     duplicatesOnly = false,
     sortBy = "updated-desc"
   } = {}) {
-    let duplicateIdSet = null;
-    if (duplicatesOnly) {
-      duplicateIdSet = findDuplicateEntryIds(entries);
-    }
+    const dupAnalysis = duplicatesOnly ? analyzeSectionDuplicates(entries) : null;
     const filtered = entries.filter((entry) => {
       const d = entry.data || {};
       if (sectionId && sectionId !== "all" && d.sectionId !== sectionId) return false;
       if (favoritesOnly && !d.favorite) return false;
-      if (duplicateIdSet && !duplicateIdSet.has(entry.id)) return false;
+      if (dupAnalysis && !dupAnalysis.duplicateIds.has(entry.id)) return false;
       if (query) {
         return matchesQuery(query, [d.title, d.username, d.url, d.notes]);
       }
@@ -7717,6 +7751,14 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     filtered.sort((a, b) => {
       const da = a.data || {};
       const db = b.data || {};
+      if (dupAnalysis) {
+        const ia = dupAnalysis.byEntryId.get(a.id);
+        const ib = dupAnalysis.byEntryId.get(b.id);
+        const secCmp = String(ia?.sectionId || "").localeCompare(String(ib?.sectionId || ""));
+        if (secCmp !== 0) return secCmp;
+        const clusterCmp = String(ia?.clusterKey || "").localeCompare(String(ib?.clusterKey || ""));
+        if (clusterCmp !== 0) return clusterCmp;
+      }
       if (Boolean(da.favorite) !== Boolean(db.favorite)) {
         return da.favorite ? -1 : 1;
       }
@@ -7733,34 +7775,84 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     });
     return filtered;
   }
-  function findDuplicateEntryIds(entries) {
-    const byKey = /* @__PURE__ */ new Map();
-    const byPwd = /* @__PURE__ */ new Map();
-    const dupIds = /* @__PURE__ */ new Set();
+  function analyzeSectionDuplicates(entries) {
+    const bySection = /* @__PURE__ */ new Map();
     for (const entry of entries) {
-      const d = entry.data || {};
-      const urlHost = extractHost(d.url);
-      const user = normalizeSearchText(d.username);
-      const title = normalizeSearchText(d.title);
-      const identityKey = urlHost && user ? `u:${urlHost}|${user}` : title && user ? `t:${title}|${user}` : null;
-      if (identityKey) {
-        const list = byKey.get(identityKey) || [];
-        list.push(entry.id);
-        byKey.set(identityKey, list);
+      const sid = entry.data?.sectionId || "uncategorized";
+      if (!bySection.has(sid)) bySection.set(sid, []);
+      bySection.get(sid).push(entry);
+    }
+    const byEntryId = /* @__PURE__ */ new Map();
+    const countBySection = /* @__PURE__ */ new Map();
+    const duplicateIds = /* @__PURE__ */ new Set();
+    const registerReason = (entryId, sectionId, reason) => {
+      duplicateIds.add(entryId);
+      let info = byEntryId.get(entryId);
+      if (!info) {
+        info = { sectionId, reasons: [], clusterKey: reason.clusterKey };
+        byEntryId.set(entryId, info);
       }
-      if (d.password && d.password.length >= 4) {
-        const pList = byPwd.get(d.password) || [];
-        pList.push(entry.id);
-        byPwd.set(d.password, pList);
+      if (!info.reasons.some((r) => r.type === reason.type)) {
+        info.reasons.push(reason);
+      }
+    };
+    for (const [sid, list] of bySection.entries()) {
+      const byUser = /* @__PURE__ */ new Map();
+      const byPwd = /* @__PURE__ */ new Map();
+      const byTitle = /* @__PURE__ */ new Map();
+      for (const entry of list) {
+        const d = entry.data || {};
+        const normUser = normalizeSearchText(d.username);
+        const pwd = String(d.password || "");
+        const normTitle = normalizeSearchText(d.title);
+        if (normUser.length >= 2) {
+          if (!byUser.has(normUser)) byUser.set(normUser, []);
+          byUser.get(normUser).push(entry.id);
+        }
+        if (pwd.length >= 3) {
+          if (!byPwd.has(pwd)) byPwd.set(pwd, []);
+          byPwd.get(pwd).push(entry.id);
+        }
+        if (normTitle.length >= 2) {
+          if (!byTitle.has(normTitle)) byTitle.set(normTitle, []);
+          byTitle.get(normTitle).push(entry.id);
+        }
+      }
+      const secDupIds = /* @__PURE__ */ new Set();
+      for (const [key, ids] of byUser.entries()) {
+        if (ids.length > 1) {
+          for (const id of ids) {
+            secDupIds.add(id);
+            registerReason(id, sid, { type: "username", count: ids.length, clusterKey: `1-user:${key}` });
+          }
+        }
+      }
+      for (const [key, ids] of byPwd.entries()) {
+        if (ids.length > 1) {
+          for (const id of ids) {
+            secDupIds.add(id);
+            registerReason(id, sid, { type: "password", count: ids.length, clusterKey: `2-pwd:${key}` });
+          }
+        }
+      }
+      for (const [key, ids] of byTitle.entries()) {
+        if (ids.length > 1) {
+          for (const id of ids) {
+            secDupIds.add(id);
+            registerReason(id, sid, { type: "title", count: ids.length, clusterKey: `3-title:${key}` });
+          }
+        }
+      }
+      if (secDupIds.size > 0) {
+        countBySection.set(sid, secDupIds.size);
       }
     }
-    for (const ids of byKey.values()) {
-      if (ids.length > 1) ids.forEach((id) => dupIds.add(id));
-    }
-    for (const ids of byPwd.values()) {
-      if (ids.length > 1) ids.forEach((id) => dupIds.add(id));
-    }
-    return dupIds;
+    return {
+      byEntryId,
+      countBySection,
+      duplicateIds,
+      totalCount: duplicateIds.size
+    };
   }
   function extractHost(rawUrl) {
     const str = String(rawUrl || "").trim();
@@ -8884,7 +8976,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
   }
 
   // src/ui/passwords-view.js
-  var SECTION_EMOJIS = ["\u{1F510}", "\u{1F9FE}", "\u{1F3E6}", "\u{1F4AC}", "\u{1F4BC}", "\u{1F310}", "\u{1F4F1}", "\u{1F6D2}", "\u{1F3AE}", "\u2601\uFE0F", "\u{1F3E0}", "\u2708\uFE0F", "\u{1F3E5}", "\u{1F393}"];
+  var SECTION_EMOJIS = ["\u{1F510}", "\u{1F9FE}", "\u{1F3E6}", "\u{1F4AC}", "\u{1F4BC}", "\u{1F310}", "\u{1F4F1}", "\u{1F6D2}", "\u{1F3AE}", "\u2601\uFE0F", "\u{1F3E0}", "\u2708\uFE0F", "\u{1F3E5}", "\u{1F393}", "\u{1F3B5}", "\u26A1"];
   function renderPasswordsView({
     session: session2,
     lang,
@@ -8914,90 +9006,72 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       countBySec.set(sid, (countBySec.get(sid) || 0) + 1);
     }
     const sortedSections = [...sections].sort((a, b) => (a.data?.order ?? 0) - (b.data?.order ?? 0));
-    const kpiSections = [...sortedSections].sort((a, b) => (countBySec.get(b.id) || 0) - (countBySec.get(a.id) || 0)).slice(0, 3);
-    const kpiStrip = el(
-      "section",
-      { class: "vault-kpi-strip", "aria-label": t(lang, "totalAccountsKpi") },
+    const dupAnalysis = analyzeSectionDuplicates(passwords);
+    const activeDupCount = state.sectionId && state.sectionId !== "all" ? dupAnalysis.countBySection.get(state.sectionId) || 0 : dupAnalysis.totalCount;
+    const secGrid = el("section", {
+      class: "section-grid-equal",
+      role: "tablist",
+      "aria-label": t(lang, "manageSections")
+    });
+    const isAllActive = !state.showTrash && !state.favoritesOnly && !state.duplicatesOnly && state.sectionId === "all";
+    secGrid.appendChild(
       el(
         "button",
         {
           type: "button",
-          class: `vault-kpi-card ${!state.showTrash && state.sectionId === "all" && !state.favoritesOnly && !state.duplicatesOnly ? "is-active" : ""}`.trim(),
+          role: "tab",
+          "aria-selected": isAllActive ? "true" : "false",
+          class: `sec-tile accent-sky ${isAllActive ? "is-active" : ""}`.trim(),
           onClick: () => onStateChange({ sectionId: "all", showTrash: false, favoritesOnly: false, duplicatesOnly: false })
         },
-        el("span", { class: "vault-kpi-label" }, t(lang, "totalAccountsKpi")),
-        el("strong", { class: "vault-kpi-value ltr-inline" }, String(passwords.length))
-      ),
-      ...kpiSections.map((sec) => {
-        const d = sec.data || {};
-        const accentCls = accentClassForHex(d.color);
-        const isAct = !state.showTrash && state.sectionId === sec.id;
-        return el(
-          "button",
-          {
-            type: "button",
-            class: `vault-kpi-card ${accentCls} ${isAct ? "is-active" : ""}`.trim(),
-            onClick: () => onStateChange({ sectionId: sec.id, showTrash: false, favoritesOnly: false, duplicatesOnly: false })
-          },
-          el("span", { class: "vault-kpi-label" }, `${d.emoji || "\u{1F4C1}"} ${d.name || ""}`),
-          el("strong", { class: "vault-kpi-value ltr-inline" }, String(countBySec.get(sec.id) || 0))
-        );
-      })
+        el(
+          "div",
+          { class: "sec-tile-top" },
+          el("span", { class: "sec-tile-name" }, `\u2728 ${t(lang, "totalAccountsKpi")}`),
+          dupAnalysis.totalCount > 0 ? el("span", { class: "sec-tile-dup", title: t(lang, "duplicates") }, `\u26A0 ${dupAnalysis.totalCount}`) : null
+        ),
+        el("strong", { class: "sec-tile-num ltr-inline" }, String(passwords.length))
+      )
     );
-    container.appendChild(kpiStrip);
-    const strip = el("div", {
-      class: "section-strip-wrap",
-      role: "tablist",
-      "aria-label": t(lang, "manageSections")
-    });
-    const addSectionPill = (label, count, active, cls, onClick) => {
-      strip.appendChild(
+    for (const sec of sortedSections) {
+      const d = sec.data || {};
+      const accentCls = accentClassForHex(d.color);
+      const isAct = !state.showTrash && state.sectionId === sec.id;
+      const secDupCount = dupAnalysis.countBySection.get(sec.id) || 0;
+      secGrid.appendChild(
         el(
           "button",
           {
             type: "button",
             role: "tab",
-            "aria-selected": active ? "true" : "false",
-            class: `sec-pill ${cls || ""} ${active ? "is-active" : ""}`.trim(),
-            onClick
+            "aria-selected": isAct ? "true" : "false",
+            class: `sec-tile ${accentCls} ${isAct ? "is-active" : ""}`.trim(),
+            onClick: () => onStateChange({ sectionId: sec.id, showTrash: false, favoritesOnly: false, duplicatesOnly: false })
           },
-          cls ? el("span", { class: "sec-dot" }) : null,
-          el("span", null, label),
-          count !== null ? el("span", { class: "sec-pill-count" }, String(count)) : null
+          el(
+            "div",
+            { class: "sec-tile-top" },
+            el("span", { class: "sec-tile-name" }, `${d.emoji || "\u{1F4C1}"} ${d.name || ""}`),
+            secDupCount > 0 ? el("span", { class: "sec-tile-dup", title: t(lang, "duplicates") }, `\u26A0 ${secDupCount}`) : null
+          ),
+          el("strong", { class: "sec-tile-num ltr-inline" }, String(countBySec.get(sec.id) || 0))
         )
       );
-    };
-    addSectionPill(
-      t(lang, "allSections"),
-      passwords.length,
-      !state.showTrash && !state.favoritesOnly && !state.duplicatesOnly && state.sectionId === "all",
-      "",
-      () => onStateChange({ sectionId: "all", showTrash: false, favoritesOnly: false, duplicatesOnly: false })
-    );
-    for (const sec of sortedSections) {
-      const d = sec.data || {};
-      addSectionPill(
-        `${d.emoji || "\u{1F4C1}"} ${d.name || ""}`,
-        countBySec.get(sec.id) || 0,
-        !state.showTrash && state.sectionId === sec.id,
-        accentClassForHex(d.color),
-        () => onStateChange({ sectionId: sec.id, showTrash: false, favoritesOnly: false, duplicatesOnly: false })
-      );
     }
-    strip.appendChild(
+    secGrid.appendChild(
       el(
         "button",
         {
           type: "button",
-          class: "sec-pill sec-pill-manage",
+          class: "sec-tile sec-tile-manage",
           "data-testid": "manage-sections-btn",
           onClick: () => openManageSectionsSheet({ session: session2, lang, sections: sortedSections, passwords, onRefresh })
         },
-        svgIcon("plus", 14),
-        t(lang, "manageSectionsBtn")
+        el("span", { class: "sec-tile-manage-icon" }, svgIcon("plus", 18)),
+        el("span", { class: "sec-tile-name" }, t(lang, "manageSectionsBtn"))
       )
     );
-    container.appendChild(strip);
+    container.appendChild(secGrid);
     const sourceList = state.showTrash ? trashedPasswords : passwords;
     const visibleEntries = filterAndSortPasswords(sourceList, {
       query: state.query,
@@ -9006,7 +9080,8 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       duplicatesOnly: !state.showTrash && state.duplicatesOnly,
       sortBy: state.sortBy
     });
-    const favCount = passwords.filter((p) => p.data?.favorite).length;
+    const scopedPasswords = state.sectionId && state.sectionId !== "all" ? passwords.filter((p) => p.data?.sectionId === state.sectionId) : passwords;
+    const favCount = scopedPasswords.filter((p) => p.data?.favorite).length;
     const selectedIds = state.selectedIds || /* @__PURE__ */ new Set();
     const isSelecting = Boolean(state.selectMode) || selectedIds.size > 0;
     const sortSelect = el(
@@ -9049,10 +9124,12 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
           "button",
           {
             type: "button",
-            class: `sub-pill ${!state.showTrash && state.duplicatesOnly ? "is-active" : ""}`.trim(),
+            "data-testid": "duplicates-filter-btn",
+            class: `sub-pill sub-pill-dup ${!state.showTrash && state.duplicatesOnly ? "is-active" : ""}`.trim(),
             onClick: () => onStateChange({ showTrash: false, favoritesOnly: false, duplicatesOnly: !state.duplicatesOnly })
           },
-          t(lang, "duplicates")
+          `\u26A0 ${t(lang, "duplicates")}`,
+          activeDupCount > 0 ? el("span", { class: "sec-pill-count" }, String(activeDupCount)) : null
         ),
         el(
           "button",
@@ -9083,6 +9160,19 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       )
     );
     container.appendChild(subFilters);
+    if (!state.showTrash && state.duplicatesOnly && visibleEntries.length > 0) {
+      container.appendChild(
+        el(
+          "div",
+          { class: "banner banner-warn" },
+          el(
+            "span",
+            null,
+            state.sectionId && state.sectionId !== "all" ? t(lang, "dupBannerSection") : t(lang, "dupBannerAll")
+          )
+        )
+      );
+    }
     if (!state.showTrash) {
       container.appendChild(
         el(
@@ -9225,15 +9315,15 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
         el(
           "div",
           { class: "glass-card empty-state" },
-          svgIcon("lock", 36),
-          el("h3", null, t(lang, "emptyPasswords")),
-          el("p", null, t(lang, "emptyPasswordsSub"))
+          svgIcon(state.duplicatesOnly ? "check" : "lock", 36),
+          el("h3", null, state.duplicatesOnly ? t(lang, "dupNoneInSection") : t(lang, "emptyPasswords")),
+          state.duplicatesOnly ? null : el("p", null, t(lang, "emptyPasswordsSub"))
         )
       );
       container.appendChild(listWrap);
       return container;
     }
-    const isGrouped = state.sectionId === "all" && !state.showTrash && !state.favoritesOnly && !state.duplicatesOnly && !state.query;
+    const isGrouped = state.sectionId === "all" && !state.showTrash && !state.favoritesOnly && !state.query;
     if (isGrouped) {
       const groups = /* @__PURE__ */ new Map();
       const uncategorized = [];
@@ -9264,6 +9354,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
               lang,
               sortedSections,
               copyField,
+              dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
               onStateChange,
               onRefresh
             })
@@ -9305,6 +9396,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
               lang,
               sortedSections,
               copyField,
+              dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
               onStateChange,
               onRefresh
             })
@@ -9347,6 +9439,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
             lang,
             sortedSections,
             copyField,
+            dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
             onStateChange,
             onRefresh
           })
@@ -9366,6 +9459,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     lang,
     sortedSections,
     copyField,
+    dupInfo = null,
     onStateChange,
     onRefresh
   }) {
@@ -9387,7 +9481,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     });
     if (isSelecting) {
       card.addEventListener("click", (e) => {
-        if (e.target.closest('input[type="checkbox"]')) return;
+        if (e.target.closest("button, input, a")) return;
         e.preventDefault();
         e.stopPropagation();
         toggleThisSelection();
@@ -9471,6 +9565,24 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       svgIcon("edit", 13),
       el("span", null, t(lang, "edit"))
     );
+    const deleteIconBtn = el(
+      "button",
+      {
+        type: "button",
+        class: "vault-mini-action vault-mini-delete",
+        "data-testid": "card-delete-btn",
+        "aria-label": `${t(lang, "delete")} ${d.title}`,
+        title: t(lang, "delete"),
+        onClick: async () => {
+          triggerHaptic(14);
+          await session2.trashRecord(entry.id);
+          showToast(`${t(lang, "movedToTrashToast")}: ${d.title || ""}`, "info");
+          await onRefresh();
+        }
+      },
+      svgIcon("trash", 13),
+      el("span", null, t(lang, "delete"))
+    );
     const titlePill = el(
       "div",
       { class: "vault-card-title-pill" },
@@ -9482,9 +9594,20 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       { class: "vault-card-head" },
       selectCheckbox,
       titlePill,
-      !state.showTrash && !isSelecting ? el("div", { class: "vault-card-actions" }, favBtn, moveIconBtn, editIconBtn) : null
+      !state.showTrash && !isSelecting ? el("div", { class: "vault-card-actions" }, favBtn, moveIconBtn, editIconBtn, deleteIconBtn) : null
     );
     card.appendChild(topRow);
+    if (!state.showTrash && state.duplicatesOnly && dupInfo && dupInfo.reasons?.length > 0) {
+      const dupRow = el(
+        "div",
+        { class: "vault-dup-tags" },
+        ...dupInfo.reasons.map((r) => {
+          const label = r.type === "username" ? t(lang, "dupReasonUser") : r.type === "password" ? t(lang, "dupReasonPass") : t(lang, "dupReasonTitle");
+          return el("span", { class: "vault-dup-tag" }, `\u26A0 ${label} (\xD7${r.count})`);
+        })
+      );
+      card.appendChild(dupRow);
+    }
     if (state.showTrash) {
       card.appendChild(
         el(
@@ -9518,94 +9641,92 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       );
       return card;
     }
-    if (!isSelecting) {
-      const rowsWrap = el("div", { class: "vault-card-rows" });
-      const primaryVal = d.username || (!d.password && d.notes ? d.notes : "");
-      if (primaryVal) {
-        rowsWrap.appendChild(
+    const rowsWrap = el("div", { class: "vault-card-rows" });
+    const primaryVal = d.username || (!d.password && d.notes ? d.notes : "");
+    if (primaryVal) {
+      rowsWrap.appendChild(
+        el(
+          "div",
+          { class: "vault-field-pill" },
+          el("span", { class: "vault-field-icon vault-field-icon-user", "aria-hidden": "true" }, "\u{1F464}"),
+          el("span", { class: "vault-field-val ltr-value" }, primaryVal),
+          el(
+            "button",
+            {
+              type: "button",
+              class: "vault-pill-btn",
+              "aria-label": `${t(lang, "copyUser")} ${d.title}`,
+              title: t(lang, "copyUser"),
+              onClick: () => copyField(primaryVal, t(lang, "usernameLabel"))
+            },
+            svgIcon("copy", 15)
+          )
+        )
+      );
+    }
+    if (d.password) {
+      const maskedText = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+      let isRevealed = false;
+      let autoHideTimer = null;
+      const pwdSpan = el("span", { class: "vault-field-val ltr-value" }, maskedText);
+      const hidePwd = () => {
+        if (autoHideTimer) {
+          clearTimeout(autoHideTimer);
+          autoHideTimer = null;
+        }
+        isRevealed = false;
+        pwdSpan.textContent = maskedText;
+        eyeBtn.classList.remove("is-revealed");
+      };
+      const eyeBtn = el(
+        "button",
+        {
+          type: "button",
+          class: "vault-pill-btn",
+          "aria-label": `${t(lang, "revealToggle")} ${d.title}`,
+          title: t(lang, "revealToggle"),
+          onClick: () => {
+            triggerHaptic(8);
+            if (isRevealed) {
+              hidePwd();
+            } else {
+              isRevealed = true;
+              pwdSpan.textContent = d.password;
+              eyeBtn.classList.add("is-revealed");
+              if (autoHideTimer) clearTimeout(autoHideTimer);
+              autoHideTimer = setTimeout(hidePwd, 15e3);
+            }
+          }
+        },
+        svgIcon("eye", 15)
+      );
+      rowsWrap.appendChild(
+        el(
+          "div",
+          { class: "vault-field-pill" },
+          el("span", { class: "vault-field-icon vault-field-icon-key", "aria-hidden": "true" }, "\u{1F511}"),
+          pwdSpan,
           el(
             "div",
-            { class: "vault-field-pill" },
-            el("span", { class: "vault-field-icon vault-field-icon-user", "aria-hidden": "true" }, "\u{1F464}"),
-            el("span", { class: "vault-field-val ltr-value" }, primaryVal),
+            { class: "vault-pill-btns" },
+            eyeBtn,
             el(
               "button",
               {
                 type: "button",
                 class: "vault-pill-btn",
-                "aria-label": `${t(lang, "copyUser")} ${d.title}`,
-                title: t(lang, "copyUser"),
-                onClick: () => copyField(primaryVal, t(lang, "usernameLabel"))
+                "aria-label": `${t(lang, "copyPass")} ${d.title}`,
+                title: t(lang, "copyPass"),
+                onClick: () => copyField(d.password, t(lang, "passwordLabel"))
               },
               svgIcon("copy", 15)
             )
           )
-        );
-      }
-      if (d.password) {
-        const maskedText = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
-        let isRevealed = false;
-        let autoHideTimer = null;
-        const pwdSpan = el("span", { class: "vault-field-val ltr-value" }, maskedText);
-        const hidePwd = () => {
-          if (autoHideTimer) {
-            clearTimeout(autoHideTimer);
-            autoHideTimer = null;
-          }
-          isRevealed = false;
-          pwdSpan.textContent = maskedText;
-          eyeBtn.classList.remove("is-revealed");
-        };
-        const eyeBtn = el(
-          "button",
-          {
-            type: "button",
-            class: "vault-pill-btn",
-            "aria-label": `${t(lang, "revealToggle")} ${d.title}`,
-            title: t(lang, "revealToggle"),
-            onClick: () => {
-              triggerHaptic(8);
-              if (isRevealed) {
-                hidePwd();
-              } else {
-                isRevealed = true;
-                pwdSpan.textContent = d.password;
-                eyeBtn.classList.add("is-revealed");
-                if (autoHideTimer) clearTimeout(autoHideTimer);
-                autoHideTimer = setTimeout(hidePwd, 15e3);
-              }
-            }
-          },
-          svgIcon("eye", 15)
-        );
-        rowsWrap.appendChild(
-          el(
-            "div",
-            { class: "vault-field-pill" },
-            el("span", { class: "vault-field-icon vault-field-icon-key", "aria-hidden": "true" }, "\u{1F511}"),
-            pwdSpan,
-            el(
-              "div",
-              { class: "vault-pill-btns" },
-              eyeBtn,
-              el(
-                "button",
-                {
-                  type: "button",
-                  class: "vault-pill-btn",
-                  "aria-label": `${t(lang, "copyPass")} ${d.title}`,
-                  title: t(lang, "copyPass"),
-                  onClick: () => copyField(d.password, t(lang, "passwordLabel"))
-                },
-                svgIcon("copy", 15)
-              )
-            )
-          )
-        );
-      }
-      if (rowsWrap.childNodes.length > 0) {
-        card.appendChild(rowsWrap);
-      }
+        )
+      );
+    }
+    if (rowsWrap.childNodes.length > 0) {
+      card.appendChild(rowsWrap);
     }
     return card;
   }
@@ -9659,12 +9780,13 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
           e.preventDefault();
           const name = newSecIn.value.trim();
           if (!name) return;
+          const nextTheme = pickNextUnusedSectionTheme(sections, SECTION_EMOJIS);
           const created = await session2.saveRecord({
             type: "section",
             data: {
               name,
-              emoji: "\u{1F4C1}",
-              color: SECTION_COLOR_OPTIONS[sections.length % SECTION_COLOR_OPTIONS.length].hex,
+              emoji: nextTheme.emoji,
+              color: nextTheme.hex,
               order: sections.length
             }
           });
@@ -9719,12 +9841,13 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
           e.preventDefault();
           const name = newSecIn.value.trim();
           if (!name) return;
+          const nextTheme = pickNextUnusedSectionTheme(sections, SECTION_EMOJIS);
           const created = await session2.saveRecord({
             type: "section",
             data: {
               name,
-              emoji: "\u{1F4C1}",
-              color: SECTION_COLOR_OPTIONS[sections.length % SECTION_COLOR_OPTIONS.length].hex,
+              emoji: nextTheme.emoji,
+              color: nextTheme.hex,
               order: sections.length
             }
           });
@@ -9924,6 +10047,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     };
     const renderList = () => {
       while (host.firstChild) host.removeChild(host.firstChild);
+      const nextTheme = pickNextUnusedSectionTheme(currentSections, SECTION_EMOJIS);
       const nameIn = el("input", {
         type: "text",
         class: "input",
@@ -9934,12 +10058,14 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       const emojiSel = el(
         "select",
         { class: "select", "aria-label": "Emoji" },
-        ...SECTION_EMOJIS.map((em) => el("option", { value: em }, em))
+        ...SECTION_EMOJIS.map((em) => el("option", { value: em, selected: em === nextTheme.emoji }, em))
       );
       const colorSel = el(
         "select",
         { class: "select", "aria-label": "Color" },
-        ...SECTION_COLOR_OPTIONS.map((c) => el("option", { value: c.hex }, lang === "en" ? c.nameEn : c.nameAr))
+        ...SECTION_COLOR_OPTIONS.map(
+          (c) => el("option", { value: c.hex, selected: c.hex === nextTheme.hex }, lang === "en" ? c.nameEn : c.nameAr)
+        )
       );
       const addForm = el(
         "form",
@@ -10463,7 +10589,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
         "div",
         { class: "settings-row" },
         el("span", { class: "settings-row-title" }, t(lang, "appVersionLabel")),
-        el("span", { class: "settings-row-desc ltr-inline mono" }, `v${integrityInfo?.version || "2.5.0"} \u2022 ${kdfInfo}`)
+        el("span", { class: "settings-row-desc ltr-inline mono" }, `v${integrityInfo?.version || "2.6.0"} \u2022 ${kdfInfo}`)
       )
     );
     pwaCard.appendChild(
@@ -12251,7 +12377,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
   }
 
   // src/main.js
-  var APP_VERSION = "2.5.0";
+  var APP_VERSION = "2.6.0";
   function isCapacitorAndroid() {
     return typeof window !== "undefined" && typeof window.Capacitor !== "undefined" && window.Capacitor?.isNativePlatform?.() === true && window.Capacitor?.getPlatform?.() === "android";
   }

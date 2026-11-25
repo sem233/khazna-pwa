@@ -197,134 +197,240 @@ body {
   pointer-events: none;
 }
 
-/* Section accent themes (Zero inline styles, CSP-strict) */
+/* Section accent themes — 12 Rich, Distinct Glassmorphism Themes (Zero inline styles, CSP-strict) */
 .accent-sky {
   --sec-accent: #38bdf8;
-  --sec-bg-tint: linear-gradient(135deg, rgba(14, 30, 56, 0.72) 0%, rgba(18, 27, 48, 0.58) 100%);
-  --sec-border: rgba(56, 189, 248, 0.32);
-  --sec-glow: 0 10px 28px -10px rgba(56, 189, 248, 0.25);
-  --sec-badge-bg: rgba(56, 189, 248, 0.18);
+  --sec-accent-rgb: 56, 189, 248;
+  --sec-active-bg: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(14, 52, 92, 0.72) 0%, rgba(12, 22, 46, 0.62) 100%);
+  --sec-border: rgba(56, 189, 248, 0.38);
+  --sec-glow: 0 12px 30px -10px rgba(56, 189, 248, 0.34);
+  --sec-badge-bg: rgba(56, 189, 248, 0.2);
   --sec-badge-color: #7dd3fc;
-  --sec-header-bg: linear-gradient(90deg, rgba(56, 189, 248, 0.16) 0%, rgba(15, 23, 42, 0.6) 100%);
+  --sec-header-bg: linear-gradient(90deg, rgba(56, 189, 248, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
 }
 .accent-emerald {
   --sec-accent: #10b981;
-  --sec-bg-tint: linear-gradient(135deg, rgba(6, 44, 34, 0.72) 0%, rgba(18, 27, 48, 0.58) 100%);
-  --sec-border: rgba(16, 185, 129, 0.32);
-  --sec-glow: 0 10px 28px -10px rgba(16, 185, 129, 0.25);
-  --sec-badge-bg: rgba(16, 185, 129, 0.18);
+  --sec-accent-rgb: 16, 185, 129;
+  --sec-active-bg: linear-gradient(135deg, #10b981 0%, #047857 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(6, 62, 48, 0.72) 0%, rgba(11, 24, 38, 0.62) 100%);
+  --sec-border: rgba(16, 185, 129, 0.38);
+  --sec-glow: 0 12px 30px -10px rgba(16, 185, 129, 0.34);
+  --sec-badge-bg: rgba(16, 185, 129, 0.2);
   --sec-badge-color: #6ee7b7;
-  --sec-header-bg: linear-gradient(90deg, rgba(16, 185, 129, 0.16) 0%, rgba(15, 23, 42, 0.6) 100%);
+  --sec-header-bg: linear-gradient(90deg, rgba(16, 185, 129, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
 }
 .accent-violet {
   --sec-accent: #a78bfa;
-  --sec-bg-tint: linear-gradient(135deg, rgba(38, 24, 68, 0.72) 0%, rgba(18, 27, 48, 0.58) 100%);
-  --sec-border: rgba(167, 139, 250, 0.32);
-  --sec-glow: 0 10px 28px -10px rgba(167, 139, 250, 0.25);
-  --sec-badge-bg: rgba(167, 139, 250, 0.18);
-  --sec-badge-color: #c4b5fd;
-  --sec-header-bg: linear-gradient(90deg, rgba(167, 139, 250, 0.16) 0%, rgba(15, 23, 42, 0.6) 100%);
+  --sec-accent-rgb: 167, 139, 250;
+  --sec-active-bg: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(54, 30, 96, 0.72) 0%, rgba(15, 20, 44, 0.62) 100%);
+  --sec-border: rgba(167, 139, 250, 0.38);
+  --sec-glow: 0 12px 30px -10px rgba(167, 139, 250, 0.34);
+  --sec-badge-bg: rgba(167, 139, 250, 0.2);
+  --sec-badge-color: #ddd6fe;
+  --sec-header-bg: linear-gradient(90deg, rgba(167, 139, 250, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
 }
 .accent-amber {
   --sec-accent: #f59e0b;
-  --sec-bg-tint: linear-gradient(135deg, rgba(46, 30, 8, 0.72) 0%, rgba(18, 27, 48, 0.58) 100%);
-  --sec-border: rgba(245, 158, 11, 0.32);
-  --sec-glow: 0 10px 28px -10px rgba(245, 158, 11, 0.25);
-  --sec-badge-bg: rgba(245, 158, 11, 0.18);
-  --sec-badge-color: #fcd34d;
-  --sec-header-bg: linear-gradient(90deg, rgba(245, 158, 11, 0.16) 0%, rgba(15, 23, 42, 0.6) 100%);
+  --sec-accent-rgb: 245, 158, 11;
+  --sec-active-bg: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(68, 42, 10, 0.72) 0%, rgba(18, 22, 42, 0.62) 100%);
+  --sec-border: rgba(245, 158, 11, 0.4);
+  --sec-glow: 0 12px 30px -10px rgba(245, 158, 11, 0.34);
+  --sec-badge-bg: rgba(245, 158, 11, 0.2);
+  --sec-badge-color: #fde68a;
+  --sec-header-bg: linear-gradient(90deg, rgba(245, 158, 11, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
 }
 .accent-rose {
   --sec-accent: #f472b6;
-  --sec-bg-tint: linear-gradient(135deg, rgba(54, 18, 38, 0.72) 0%, rgba(18, 27, 48, 0.58) 100%);
-  --sec-border: rgba(244, 114, 182, 0.32);
-  --sec-glow: 0 10px 28px -10px rgba(244, 114, 182, 0.25);
-  --sec-badge-bg: rgba(244, 114, 182, 0.18);
-  --sec-badge-color: #f9a8d4;
-  --sec-header-bg: linear-gradient(90deg, rgba(244, 114, 182, 0.16) 0%, rgba(15, 23, 42, 0.6) 100%);
+  --sec-accent-rgb: 244, 114, 182;
+  --sec-active-bg: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(74, 20, 52, 0.72) 0%, rgba(18, 20, 44, 0.62) 100%);
+  --sec-border: rgba(244, 114, 182, 0.4);
+  --sec-glow: 0 12px 30px -10px rgba(244, 114, 182, 0.34);
+  --sec-badge-bg: rgba(244, 114, 182, 0.2);
+  --sec-badge-color: #fbcfe8;
+  --sec-header-bg: linear-gradient(90deg, rgba(244, 114, 182, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
 }
 .accent-teal {
   --sec-accent: #2dd4bf;
-  --sec-bg-tint: linear-gradient(135deg, rgba(10, 42, 44, 0.72) 0%, rgba(18, 27, 48, 0.58) 100%);
-  --sec-border: rgba(45, 212, 191, 0.32);
-  --sec-glow: 0 10px 28px -10px rgba(45, 212, 191, 0.25);
-  --sec-badge-bg: rgba(45, 212, 191, 0.18);
-  --sec-badge-color: #5eead4;
-  --sec-header-bg: linear-gradient(90deg, rgba(45, 212, 191, 0.16) 0%, rgba(15, 23, 42, 0.6) 100%);
+  --sec-accent-rgb: 45, 212, 191;
+  --sec-active-bg: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(10, 58, 62, 0.72) 0%, rgba(12, 22, 42, 0.62) 100%);
+  --sec-border: rgba(45, 212, 191, 0.4);
+  --sec-glow: 0 12px 30px -10px rgba(45, 212, 191, 0.34);
+  --sec-badge-bg: rgba(45, 212, 191, 0.2);
+  --sec-badge-color: #99f6e4;
+  --sec-header-bg: linear-gradient(90deg, rgba(45, 212, 191, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
 }
 .accent-coral {
   --sec-accent: #fb7185;
-  --sec-bg-tint: linear-gradient(135deg, rgba(54, 20, 26, 0.72) 0%, rgba(18, 27, 48, 0.58) 100%);
-  --sec-border: rgba(251, 113, 133, 0.32);
-  --sec-glow: 0 10px 28px -10px rgba(251, 113, 133, 0.25);
-  --sec-badge-bg: rgba(251, 113, 133, 0.18);
-  --sec-badge-color: #fda4af;
-  --sec-header-bg: linear-gradient(90deg, rgba(251, 113, 133, 0.16) 0%, rgba(15, 23, 42, 0.6) 100%);
+  --sec-accent-rgb: 251, 113, 133;
+  --sec-active-bg: linear-gradient(135deg, #f43f5e 0%, #be123c 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(76, 22, 34, 0.72) 0%, rgba(18, 20, 44, 0.62) 100%);
+  --sec-border: rgba(251, 113, 133, 0.4);
+  --sec-glow: 0 12px 30px -10px rgba(251, 113, 133, 0.34);
+  --sec-badge-bg: rgba(251, 113, 133, 0.2);
+  --sec-badge-color: #fecdd3;
+  --sec-header-bg: linear-gradient(90deg, rgba(251, 113, 133, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
+}
+.accent-indigo {
+  --sec-accent: #818cf8;
+  --sec-accent-rgb: 129, 140, 248;
+  --sec-active-bg: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(36, 38, 96, 0.74) 0%, rgba(12, 18, 44, 0.62) 100%);
+  --sec-border: rgba(129, 140, 248, 0.4);
+  --sec-glow: 0 12px 30px -10px rgba(129, 140, 248, 0.36);
+  --sec-badge-bg: rgba(129, 140, 248, 0.22);
+  --sec-badge-color: #c7d2fe;
+  --sec-header-bg: linear-gradient(90deg, rgba(129, 140, 248, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
+}
+.accent-lime {
+  --sec-accent: #a3e635;
+  --sec-accent-rgb: 163, 230, 53;
+  --sec-active-bg: linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(38, 58, 16, 0.72) 0%, rgba(14, 24, 36, 0.62) 100%);
+  --sec-border: rgba(163, 230, 53, 0.38);
+  --sec-glow: 0 12px 30px -10px rgba(163, 230, 53, 0.32);
+  --sec-badge-bg: rgba(163, 230, 53, 0.2);
+  --sec-badge-color: #d9f99d;
+  --sec-header-bg: linear-gradient(90deg, rgba(163, 230, 53, 0.2) 0%, rgba(15, 23, 42, 0.62) 100%);
+}
+.accent-fuchsia {
+  --sec-accent: #e879f9;
+  --sec-accent-rgb: 232, 121, 249;
+  --sec-active-bg: linear-gradient(135deg, #d946ef 0%, #a21caf 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(66, 22, 78, 0.72) 0%, rgba(18, 20, 44, 0.62) 100%);
+  --sec-border: rgba(232, 121, 249, 0.4);
+  --sec-glow: 0 12px 30px -10px rgba(232, 121, 249, 0.35);
+  --sec-badge-bg: rgba(232, 121, 249, 0.2);
+  --sec-badge-color: #f5d0fe;
+  --sec-header-bg: linear-gradient(90deg, rgba(232, 121, 249, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
+}
+.accent-cyan {
+  --sec-accent: #22d3ee;
+  --sec-accent-rgb: 34, 211, 238;
+  --sec-active-bg: linear-gradient(135deg, #06b6d4 0%, #0e7490 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(10, 56, 74, 0.72) 0%, rgba(12, 22, 44, 0.62) 100%);
+  --sec-border: rgba(34, 211, 238, 0.4);
+  --sec-glow: 0 12px 30px -10px rgba(34, 211, 238, 0.35);
+  --sec-badge-bg: rgba(34, 211, 238, 0.2);
+  --sec-badge-color: #a5f3fc;
+  --sec-header-bg: linear-gradient(90deg, rgba(34, 211, 238, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
+}
+.accent-orange {
+  --sec-accent: #fb923c;
+  --sec-accent-rgb: 251, 146, 60;
+  --sec-active-bg: linear-gradient(135deg, #f97316 0%, #c2410c 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(74, 34, 14, 0.72) 0%, rgba(18, 22, 42, 0.62) 100%);
+  --sec-border: rgba(251, 146, 60, 0.4);
+  --sec-glow: 0 12px 30px -10px rgba(251, 146, 60, 0.35);
+  --sec-badge-bg: rgba(251, 146, 60, 0.2);
+  --sec-badge-color: #fed7aa;
+  --sec-header-bg: linear-gradient(90deg, rgba(251, 146, 60, 0.22) 0%, rgba(15, 23, 42, 0.62) 100%);
 }
 .accent-slate {
   --sec-accent: #94a3b8;
-  --sec-bg-tint: linear-gradient(135deg, rgba(24, 30, 42, 0.72) 0%, rgba(18, 27, 48, 0.58) 100%);
-  --sec-border: rgba(148, 163, 184, 0.28);
-  --sec-glow: 0 10px 28px -10px rgba(148, 163, 184, 0.15);
+  --sec-accent-rgb: 148, 163, 184;
+  --sec-active-bg: linear-gradient(135deg, #64748b 0%, #334155 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(28, 36, 52, 0.72) 0%, rgba(14, 20, 38, 0.62) 100%);
+  --sec-border: rgba(148, 163, 184, 0.3);
+  --sec-glow: 0 12px 30px -10px rgba(148, 163, 184, 0.18);
   --sec-badge-bg: rgba(148, 163, 184, 0.18);
   --sec-badge-color: #cbd5e1;
-  --sec-header-bg: linear-gradient(90deg, rgba(148, 163, 184, 0.16) 0%, rgba(15, 23, 42, 0.6) 100%);
+  --sec-header-bg: linear-gradient(90deg, rgba(148, 163, 184, 0.18) 0%, rgba(15, 23, 42, 0.62) 100%);
 }
 
-/* Light Theme Theme Adaptations */
+/* Light Theme Adaptations */
 :root[data-theme="light"] .accent-sky {
-  --sec-bg-tint: linear-gradient(135deg, rgba(224, 242, 254, 0.82) 0%, rgba(255, 255, 255, 0.75) 100%);
-  --sec-border: rgba(56, 189, 248, 0.45);
-  --sec-header-bg: linear-gradient(90deg, rgba(56, 189, 248, 0.2) 0%, rgba(255, 255, 255, 0.6) 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(224, 242, 254, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(14, 165, 233, 0.45);
+  --sec-header-bg: linear-gradient(90deg, rgba(56, 189, 248, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
   --sec-badge-bg: rgba(56, 189, 248, 0.22);
   --sec-badge-color: #0369a1;
 }
 :root[data-theme="light"] .accent-emerald {
-  --sec-bg-tint: linear-gradient(135deg, rgba(209, 250, 229, 0.82) 0%, rgba(255, 255, 255, 0.75) 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(209, 250, 229, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
   --sec-border: rgba(16, 185, 129, 0.45);
-  --sec-header-bg: linear-gradient(90deg, rgba(16, 185, 129, 0.2) 0%, rgba(255, 255, 255, 0.6) 100%);
+  --sec-header-bg: linear-gradient(90deg, rgba(16, 185, 129, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
   --sec-badge-bg: rgba(16, 185, 129, 0.22);
   --sec-badge-color: #047857;
 }
 :root[data-theme="light"] .accent-violet {
-  --sec-bg-tint: linear-gradient(135deg, rgba(237, 233, 254, 0.82) 0%, rgba(255, 255, 255, 0.75) 100%);
-  --sec-border: rgba(167, 139, 250, 0.45);
-  --sec-header-bg: linear-gradient(90deg, rgba(167, 139, 250, 0.2) 0%, rgba(255, 255, 255, 0.6) 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(237, 233, 254, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(139, 92, 246, 0.45);
+  --sec-header-bg: linear-gradient(90deg, rgba(167, 139, 250, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
   --sec-badge-bg: rgba(167, 139, 250, 0.22);
   --sec-badge-color: #6d28d9;
 }
 :root[data-theme="light"] .accent-amber {
-  --sec-bg-tint: linear-gradient(135deg, rgba(254, 243, 199, 0.82) 0%, rgba(255, 255, 255, 0.75) 100%);
-  --sec-border: rgba(245, 158, 11, 0.45);
-  --sec-header-bg: linear-gradient(90deg, rgba(245, 158, 11, 0.2) 0%, rgba(255, 255, 255, 0.6) 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(254, 243, 199, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(245, 158, 11, 0.48);
+  --sec-header-bg: linear-gradient(90deg, rgba(245, 158, 11, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
   --sec-badge-bg: rgba(245, 158, 11, 0.22);
   --sec-badge-color: #b45309;
 }
 :root[data-theme="light"] .accent-rose {
-  --sec-bg-tint: linear-gradient(135deg, rgba(252, 231, 243, 0.82) 0%, rgba(255, 255, 255, 0.75) 100%);
-  --sec-border: rgba(244, 114, 182, 0.45);
-  --sec-header-bg: linear-gradient(90deg, rgba(244, 114, 182, 0.2) 0%, rgba(255, 255, 255, 0.6) 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(252, 231, 243, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(236, 72, 153, 0.45);
+  --sec-header-bg: linear-gradient(90deg, rgba(244, 114, 182, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
   --sec-badge-bg: rgba(244, 114, 182, 0.22);
   --sec-badge-color: #be185d;
 }
 :root[data-theme="light"] .accent-teal {
-  --sec-bg-tint: linear-gradient(135deg, rgba(204, 251, 241, 0.82) 0%, rgba(255, 255, 255, 0.75) 100%);
-  --sec-border: rgba(45, 212, 191, 0.45);
-  --sec-header-bg: linear-gradient(90deg, rgba(45, 212, 191, 0.2) 0%, rgba(255, 255, 255, 0.6) 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(204, 251, 241, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(20, 184, 166, 0.45);
+  --sec-header-bg: linear-gradient(90deg, rgba(45, 212, 191, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
   --sec-badge-bg: rgba(45, 212, 191, 0.22);
   --sec-badge-color: #0f766e;
 }
 :root[data-theme="light"] .accent-coral {
-  --sec-bg-tint: linear-gradient(135deg, rgba(255, 228, 230, 0.82) 0%, rgba(255, 255, 255, 0.75) 100%);
-  --sec-border: rgba(251, 113, 133, 0.45);
-  --sec-header-bg: linear-gradient(90deg, rgba(251, 113, 133, 0.2) 0%, rgba(255, 255, 255, 0.6) 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(255, 228, 230, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(244, 63, 94, 0.45);
+  --sec-header-bg: linear-gradient(90deg, rgba(251, 113, 133, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
   --sec-badge-bg: rgba(251, 113, 133, 0.22);
   --sec-badge-color: #be123c;
 }
+:root[data-theme="light"] .accent-indigo {
+  --sec-bg-tint: linear-gradient(155deg, rgba(224, 231, 255, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(99, 102, 241, 0.45);
+  --sec-header-bg: linear-gradient(90deg, rgba(129, 140, 248, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
+  --sec-badge-bg: rgba(129, 140, 248, 0.22);
+  --sec-badge-color: #4338ca;
+}
+:root[data-theme="light"] .accent-lime {
+  --sec-bg-tint: linear-gradient(155deg, rgba(236, 252, 203, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(132, 204, 22, 0.45);
+  --sec-header-bg: linear-gradient(90deg, rgba(163, 230, 53, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
+  --sec-badge-bg: rgba(163, 230, 53, 0.22);
+  --sec-badge-color: #4d7c0f;
+}
+:root[data-theme="light"] .accent-fuchsia {
+  --sec-bg-tint: linear-gradient(155deg, rgba(250, 232, 255, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(217, 70, 239, 0.45);
+  --sec-header-bg: linear-gradient(90deg, rgba(232, 121, 249, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
+  --sec-badge-bg: rgba(232, 121, 249, 0.22);
+  --sec-badge-color: #a21caf;
+}
+:root[data-theme="light"] .accent-cyan {
+  --sec-bg-tint: linear-gradient(155deg, rgba(207, 250, 254, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(6, 182, 212, 0.45);
+  --sec-header-bg: linear-gradient(90deg, rgba(34, 211, 238, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
+  --sec-badge-bg: rgba(34, 211, 238, 0.22);
+  --sec-badge-color: #0e7490;
+}
+:root[data-theme="light"] .accent-orange {
+  --sec-bg-tint: linear-gradient(155deg, rgba(255, 237, 213, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
+  --sec-border: rgba(249, 115, 22, 0.45);
+  --sec-header-bg: linear-gradient(90deg, rgba(251, 146, 60, 0.24) 0%, rgba(255, 255, 255, 0.7) 100%);
+  --sec-badge-bg: rgba(251, 146, 60, 0.22);
+  --sec-badge-color: #c2410c;
+}
 :root[data-theme="light"] .accent-slate {
-  --sec-bg-tint: linear-gradient(135deg, rgba(241, 245, 249, 0.85) 0%, rgba(255, 255, 255, 0.75) 100%);
+  --sec-bg-tint: linear-gradient(155deg, rgba(241, 245, 249, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
   --sec-border: rgba(148, 163, 184, 0.35);
-  --sec-header-bg: linear-gradient(90deg, rgba(148, 163, 184, 0.2) 0%, rgba(255, 255, 255, 0.6) 100%);
+  --sec-header-bg: linear-gradient(90deg, rgba(148, 163, 184, 0.22) 0%, rgba(255, 255, 255, 0.7) 100%);
   --sec-badge-bg: rgba(148, 163, 184, 0.22);
   --sec-badge-color: #475569;
 }

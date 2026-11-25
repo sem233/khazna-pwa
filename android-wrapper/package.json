@@ -1,6 +1,6 @@
 {
   "name": "khazna-android",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Khazna Password Manager — Android APK wrapper via Capacitor",
   "private": true,
   "scripts": {

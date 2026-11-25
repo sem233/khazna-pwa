@@ -20,21 +20,53 @@ const ACCENT_MAP = new Map([
   ['#f472b6', 'accent-rose'],
   ['#2dd4bf', 'accent-teal'],
   ['#fb7185', 'accent-coral'],
+  ['#818cf8', 'accent-indigo'],
+  ['#a3e635', 'accent-lime'],
+  ['#e879f9', 'accent-fuchsia'],
+  ['#22d3ee', 'accent-cyan'],
+  ['#fb923c', 'accent-orange'],
   ['#94a3b8', 'accent-slate'],
 ]);
 
 export const SECTION_COLOR_OPTIONS = Object.freeze([
-  { hex: '#38bdf8', cls: 'accent-sky', nameAr: 'سماوي', nameEn: 'Sky' },
+  { hex: '#38bdf8', cls: 'accent-sky', nameAr: 'سماوي مشع', nameEn: 'Electric Sky' },
   { hex: '#10b981', cls: 'accent-emerald', nameAr: 'زمردي', nameEn: 'Emerald' },
-  { hex: '#a78bfa', cls: 'accent-violet', nameAr: 'بنفسجي', nameEn: 'Violet' },
-  { hex: '#f59e0b', cls: 'accent-amber', nameAr: 'كهرماني', nameEn: 'Amber' },
-  { hex: '#f472b6', cls: 'accent-rose', nameAr: 'وردي', nameEn: 'Rose' },
-  { hex: '#2dd4bf', cls: 'accent-teal', nameAr: 'فيروزي', nameEn: 'Teal' },
-  { hex: '#fb7185', cls: 'accent-coral', nameAr: 'مرجاني', nameEn: 'Coral' },
+  { hex: '#a78bfa', cls: 'accent-violet', nameAr: 'بنفسجي ملكي', nameEn: 'Royal Violet' },
+  { hex: '#2dd4bf', cls: 'accent-teal', nameAr: 'فيروزي', nameEn: 'Ocean Teal' },
+  { hex: '#f59e0b', cls: 'accent-amber', nameAr: 'كهرماني ذهبي', nameEn: 'Golden Amber' },
+  { hex: '#f472b6', cls: 'accent-rose', nameAr: 'وردي نيون', nameEn: 'Neon Rose' },
+  { hex: '#fb7185', cls: 'accent-coral', nameAr: 'مرجاني', nameEn: 'Coral Glow' },
+  { hex: '#818cf8', cls: 'accent-indigo', nameAr: 'نيلي عميق', nameEn: 'Deep Indigo' },
+  { hex: '#a3e635', cls: 'accent-lime', nameAr: 'ليموني', nameEn: 'Vibrant Lime' },
+  { hex: '#e879f9', cls: 'accent-fuchsia', nameAr: 'أرجواني', nameEn: 'Fuchsia' },
+  { hex: '#22d3ee', cls: 'accent-cyan', nameAr: 'سماوي جليدي', nameEn: 'Ice Cyan' },
+  { hex: '#fb923c', cls: 'accent-orange', nameAr: 'برتقالي دافئ', nameEn: 'Sunset Orange' },
 ]);
 
 export function accentClassForHex(hex) {
   return ACCENT_MAP.get(String(hex || '').toLowerCase()) || 'accent-sky';
+}
+
+/**
+ * Picks the next unused section theme color & emoji so every new section gets a unique visual identity.
+ */
+export function pickNextUnusedSectionTheme(existingSections = [], emojiPool = []) {
+  const usedColors = new Set(
+    existingSections.map((s) => String(s?.data?.color || '').toLowerCase()).filter(Boolean)
+  );
+  const usedEmojis = new Set(
+    existingSections.map((s) => String(s?.data?.emoji || '')).filter(Boolean)
+  );
+
+  const unusedColor = SECTION_COLOR_OPTIONS.find((c) => !usedColors.has(c.hex));
+  const colorObj =
+    unusedColor || SECTION_COLOR_OPTIONS[existingSections.length % SECTION_COLOR_OPTIONS.length];
+
+  const unusedEmoji = emojiPool.find((em) => !usedEmojis.has(em));
+  const emoji =
+    unusedEmoji || (emojiPool.length > 0 ? emojiPool[existingSections.length % emojiPool.length] : '📁');
+
+  return { hex: colorObj.hex, cls: colorObj.cls, emoji };
 }
 
 /**

@@ -38,7 +38,7 @@ import {
 import { createMemoryBackend, VaultStorage } from '../src/storage/idb.js';
 import { ClipboardGuard, VaultSession } from '../src/auth/session.js';
 import { detectCardBrand, maskCardNumber, validateLuhn } from '../src/domain/cards.js';
-import { filterAndSortPasswords } from '../src/domain/search.js';
+import { analyzeSectionDuplicates, filterAndSortPasswords } from '../src/domain/search.js';
 import { computeVaultAuditAndStats } from '../src/domain/audit.js';
 import {
   exportBitwardenJson,
@@ -314,6 +314,29 @@ await test('Domain: Card brand detection, Luhn, masking, Arabic search & audit',
 
   const stats = computeVaultAuditAndStats({ sections: [], passwords: list, cards: [], notes: [] });
   assert.equal(stats.audit.reusedCount, 2);
+
+  // Per-section duplicate detection:
+  // Identical username/password in DIFFERENT sections must NOT cross-contaminate,
+  // while duplicates INSIDE the same section MUST be detected with exact reasons.
+  const dupList = [
+    { id: 'a1', data: { title: 'FB 1', username: '01099999999', password: 'pw1', sectionId: 'sec-fb' } },
+    { id: 'a2', data: { title: 'FB Old', username: '01099999999', password: 'pw2', sectionId: 'sec-fb' } },
+    { id: 'b1', data: { title: 'Electric Bill', username: '01099999999', password: '', sectionId: 'sec-bills' } },
+    { id: 'c1', data: { title: 'Work Mail', username: 'a@co.com', password: 'SharedPass#1', sectionId: 'sec-work' } },
+    { id: 'c2', data: { title: 'Work VPN', username: 'b@co.com', password: 'SharedPass#1', sectionId: 'sec-work' } },
+  ];
+  const dupAnalysis = analyzeSectionDuplicates(dupList);
+  assert.equal(dupAnalysis.countBySection.get('sec-fb'), 2);
+  assert.equal(dupAnalysis.countBySection.get('sec-bills'), undefined);
+  assert.equal(dupAnalysis.countBySection.get('sec-work'), 2);
+  assert.equal(dupAnalysis.duplicateIds.has('b1'), false);
+  assert.equal(dupAnalysis.byEntryId.get('a1').reasons[0].type, 'username');
+  assert.equal(dupAnalysis.byEntryId.get('c1').reasons[0].type, 'password');
+
+  const fbDups = filterAndSortPasswords(dupList, { sectionId: 'sec-fb', duplicatesOnly: true });
+  assert.equal(fbDups.length, 2);
+  const billsDups = filterAndSortPasswords(dupList, { sectionId: 'sec-bills', duplicatesOnly: true });
+  assert.equal(billsDups.length, 0);
 });
 
 await test('Import/Export & Sync: .vault, Bitwarden JSON, Chrome CSV, and encrypted Sync merge', async () => {

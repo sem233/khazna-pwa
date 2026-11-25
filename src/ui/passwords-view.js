@@ -11,12 +11,13 @@
  */
 
 import { evaluatePasswordStrength } from '../crypto/vault-crypto.js';
-import { filterAndSortPasswords } from '../domain/search.js';
+import { analyzeSectionDuplicates, filterAndSortPasswords } from '../domain/search.js';
 import { formatError, t } from '../i18n/strings.js';
 import {
   accentClassForHex,
   el,
   openBottomSheet,
+  pickNextUnusedSectionTheme,
   SECTION_COLOR_OPTIONS,
   showToast,
   svgIcon,
@@ -24,7 +25,7 @@ import {
 } from './dom.js';
 import { openGeneratorSheet } from './generator-sheet.js';
 
-const SECTION_EMOJIS = ['🔐', '🧾', '🏦', '💬', '💼', '🌐', '📱', '🛒', '🎮', '☁️', '🏠', '✈️', '🏥', '🎓'];
+const SECTION_EMOJIS = ['🔐', '🧾', '🏦', '💬', '💼', '🌐', '📱', '🛒', '🎮', '☁️', '🏠', '✈️', '🏥', '🎓', '🎵', '⚡'];
 
 export function renderPasswordsView({
   session,
@@ -58,104 +59,95 @@ export function renderPasswordsView({
   }
   const sortedSections = [...sections].sort((a, b) => (a.data?.order ?? 0) - (b.data?.order ?? 0));
 
-  // --- 1) Top Glass KPI Strip (Total + Top 3 Sections) ---
-  const kpiSections = [...sortedSections]
-    .sort((a, b) => (countBySec.get(b.id) || 0) - (countBySec.get(a.id) || 0))
-    .slice(0, 3);
+  // Practical Per-Section Duplicate Analysis (computed strictly within each section)
+  const dupAnalysis = analyzeSectionDuplicates(passwords);
+  const activeDupCount =
+    state.sectionId && state.sectionId !== 'all'
+      ? dupAnalysis.countBySection.get(state.sectionId) || 0
+      : dupAnalysis.totalCount;
 
-  const kpiStrip = el(
-    'section',
-    { class: 'vault-kpi-strip', 'aria-label': t(lang, 'totalAccountsKpi') },
-    el(
-      'button',
-      {
-        type: 'button',
-        class: `vault-kpi-card ${!state.showTrash && state.sectionId === 'all' && !state.favoritesOnly && !state.duplicatesOnly ? 'is-active' : ''}`.trim(),
-        onClick: () =>
-          onStateChange({ sectionId: 'all', showTrash: false, favoritesOnly: false, duplicatesOnly: false }),
-      },
-      el('span', { class: 'vault-kpi-label' }, t(lang, 'totalAccountsKpi')),
-      el('strong', { class: 'vault-kpi-value ltr-inline' }, String(passwords.length))
-    ),
-    ...kpiSections.map((sec) => {
-      const d = sec.data || {};
-      const accentCls = accentClassForHex(d.color);
-      const isAct = !state.showTrash && state.sectionId === sec.id;
-      return el(
-        'button',
-        {
-          type: 'button',
-          class: `vault-kpi-card ${accentCls} ${isAct ? 'is-active' : ''}`.trim(),
-          onClick: () =>
-            onStateChange({ sectionId: sec.id, showTrash: false, favoritesOnly: false, duplicatesOnly: false }),
-        },
-        el('span', { class: 'vault-kpi-label' }, `${d.emoji || '📁'} ${d.name || ''}`),
-        el('strong', { class: 'vault-kpi-value ltr-inline' }, String(countBySec.get(sec.id) || 0))
-      );
-    })
-  );
-  container.appendChild(kpiStrip);
-
-  // --- 2) Wrapping Centered Section Pills (ALL sections always visible — ZERO clipping!) ---
-  const strip = el('div', {
-    class: 'section-strip-wrap',
+  // --- 1) Equal-Sized Uniform Glass Grid for ALL Sections (Distinct Theme per Section!) ---
+  const secGrid = el('section', {
+    class: 'section-grid-equal',
     role: 'tablist',
     'aria-label': t(lang, 'manageSections'),
   });
 
-  const addSectionPill = (label, count, active, cls, onClick) => {
-    strip.appendChild(
+  // "All Accounts" equal tile
+  const isAllActive =
+    !state.showTrash && !state.favoritesOnly && !state.duplicatesOnly && state.sectionId === 'all';
+  secGrid.appendChild(
+    el(
+      'button',
+      {
+        type: 'button',
+        role: 'tab',
+        'aria-selected': isAllActive ? 'true' : 'false',
+        class: `sec-tile accent-sky ${isAllActive ? 'is-active' : ''}`.trim(),
+        onClick: () =>
+          onStateChange({ sectionId: 'all', showTrash: false, favoritesOnly: false, duplicatesOnly: false }),
+      },
+      el(
+        'div',
+        { class: 'sec-tile-top' },
+        el('span', { class: 'sec-tile-name' }, `✨ ${t(lang, 'totalAccountsKpi')}`),
+        dupAnalysis.totalCount > 0
+          ? el('span', { class: 'sec-tile-dup', title: t(lang, 'duplicates') }, `⚠ ${dupAnalysis.totalCount}`)
+          : null
+      ),
+      el('strong', { class: 'sec-tile-num ltr-inline' }, String(passwords.length))
+    )
+  );
+
+  // Every user section rendered at 100% EQUAL size with its own distinct glass theme
+  for (const sec of sortedSections) {
+    const d = sec.data || {};
+    const accentCls = accentClassForHex(d.color);
+    const isAct = !state.showTrash && state.sectionId === sec.id;
+    const secDupCount = dupAnalysis.countBySection.get(sec.id) || 0;
+
+    secGrid.appendChild(
       el(
         'button',
         {
           type: 'button',
           role: 'tab',
-          'aria-selected': active ? 'true' : 'false',
-          class: `sec-pill ${cls || ''} ${active ? 'is-active' : ''}`.trim(),
-          onClick,
+          'aria-selected': isAct ? 'true' : 'false',
+          class: `sec-tile ${accentCls} ${isAct ? 'is-active' : ''}`.trim(),
+          onClick: () =>
+            onStateChange({ sectionId: sec.id, showTrash: false, favoritesOnly: false, duplicatesOnly: false }),
         },
-        cls ? el('span', { class: 'sec-dot' }) : null,
-        el('span', null, label),
-        count !== null ? el('span', { class: 'sec-pill-count' }, String(count)) : null
+        el(
+          'div',
+          { class: 'sec-tile-top' },
+          el('span', { class: 'sec-tile-name' }, `${d.emoji || '📁'} ${d.name || ''}`),
+          secDupCount > 0
+            ? el('span', { class: 'sec-tile-dup', title: t(lang, 'duplicates') }, `⚠ ${secDupCount}`)
+            : null
+        ),
+        el('strong', { class: 'sec-tile-num ltr-inline' }, String(countBySec.get(sec.id) || 0))
       )
-    );
-  };
-
-  addSectionPill(
-    t(lang, 'allSections'),
-    passwords.length,
-    !state.showTrash && !state.favoritesOnly && !state.duplicatesOnly && state.sectionId === 'all',
-    '',
-    () => onStateChange({ sectionId: 'all', showTrash: false, favoritesOnly: false, duplicatesOnly: false })
-  );
-
-  for (const sec of sortedSections) {
-    const d = sec.data || {};
-    addSectionPill(
-      `${d.emoji || '📁'} ${d.name || ''}`,
-      countBySec.get(sec.id) || 0,
-      !state.showTrash && state.sectionId === sec.id,
-      accentClassForHex(d.color),
-      () => onStateChange({ sectionId: sec.id, showTrash: false, favoritesOnly: false, duplicatesOnly: false })
     );
   }
 
-  strip.appendChild(
+  // Equal-sized "+ Manage Sections" tile
+  secGrid.appendChild(
     el(
       'button',
       {
         type: 'button',
-        class: 'sec-pill sec-pill-manage',
+        class: 'sec-tile sec-tile-manage',
         'data-testid': 'manage-sections-btn',
         onClick: () => openManageSectionsSheet({ session, lang, sections: sortedSections, passwords, onRefresh }),
       },
-      svgIcon('plus', 14),
-      t(lang, 'manageSectionsBtn')
+      el('span', { class: 'sec-tile-manage-icon' }, svgIcon('plus', 18)),
+      el('span', { class: 'sec-tile-name' }, t(lang, 'manageSectionsBtn'))
     )
   );
-  container.appendChild(strip);
 
-  // --- Filtered List (Favorites ALWAYS sorted to the top!) ---
+  container.appendChild(secGrid);
+
+  // --- Filtered List (Favorites ALWAYS sorted to top; Duplicates grouped per section!) ---
   const sourceList = state.showTrash ? trashedPasswords : passwords;
   const visibleEntries = filterAndSortPasswords(sourceList, {
     query: state.query,
@@ -165,8 +157,12 @@ export function renderPasswordsView({
     sortBy: state.sortBy,
   });
 
-  // --- 3) Sub-Filters Row (All / Pinned Favorites / Duplicates / Trash + Multi-Select + Sort) ---
-  const favCount = passwords.filter((p) => p.data?.favorite).length;
+  // --- 2) Sub-Filters Row (All / Pinned Favorites / Per-Section Duplicates / Trash + Multi-Select + Sort) ---
+  const scopedPasswords =
+    state.sectionId && state.sectionId !== 'all'
+      ? passwords.filter((p) => p.data?.sectionId === state.sectionId)
+      : passwords;
+  const favCount = scopedPasswords.filter((p) => p.data?.favorite).length;
   const selectedIds = state.selectedIds || new Set();
   const isSelecting = Boolean(state.selectMode) || selectedIds.size > 0;
 
@@ -211,10 +207,12 @@ export function renderPasswordsView({
         'button',
         {
           type: 'button',
-          class: `sub-pill ${!state.showTrash && state.duplicatesOnly ? 'is-active' : ''}`.trim(),
+          'data-testid': 'duplicates-filter-btn',
+          class: `sub-pill sub-pill-dup ${!state.showTrash && state.duplicatesOnly ? 'is-active' : ''}`.trim(),
           onClick: () => onStateChange({ showTrash: false, favoritesOnly: false, duplicatesOnly: !state.duplicatesOnly }),
         },
-        t(lang, 'duplicates')
+        `⚠ ${t(lang, 'duplicates')}`,
+        activeDupCount > 0 ? el('span', { class: 'sec-pill-count' }, String(activeDupCount)) : null
       ),
       el(
         'button',
@@ -247,6 +245,23 @@ export function renderPasswordsView({
     )
   );
   container.appendChild(subFilters);
+
+  // Per-Section Duplicates Info Banner
+  if (!state.showTrash && state.duplicatesOnly && visibleEntries.length > 0) {
+    container.appendChild(
+      el(
+        'div',
+        { class: 'banner banner-warn' },
+        el(
+          'span',
+          null,
+          state.sectionId && state.sectionId !== 'all'
+            ? t(lang, 'dupBannerSection')
+            : t(lang, 'dupBannerAll')
+        )
+      )
+    );
+  }
 
   // --- 4) Full-Width Glass "+ Add New Item" Bar & Search Bar ---
   if (!state.showTrash) {
@@ -401,9 +416,9 @@ export function renderPasswordsView({
       el(
         'div',
         { class: 'glass-card empty-state' },
-        svgIcon('lock', 36),
-        el('h3', null, t(lang, 'emptyPasswords')),
-        el('p', null, t(lang, 'emptyPasswordsSub'))
+        svgIcon(state.duplicatesOnly ? 'check' : 'lock', 36),
+        el('h3', null, state.duplicatesOnly ? t(lang, 'dupNoneInSection') : t(lang, 'emptyPasswords')),
+        state.duplicatesOnly ? null : el('p', null, t(lang, 'emptyPasswordsSub'))
       )
     );
     container.appendChild(listWrap);
@@ -414,7 +429,6 @@ export function renderPasswordsView({
     state.sectionId === 'all' &&
     !state.showTrash &&
     !state.favoritesOnly &&
-    !state.duplicatesOnly &&
     !state.query;
 
   if (isGrouped) {
@@ -450,6 +464,7 @@ export function renderPasswordsView({
             lang,
             sortedSections,
             copyField,
+            dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
             onStateChange,
             onRefresh,
           })
@@ -494,6 +509,7 @@ export function renderPasswordsView({
             lang,
             sortedSections,
             copyField,
+            dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
             onStateChange,
             onRefresh,
           })
@@ -536,6 +552,7 @@ export function renderPasswordsView({
           lang,
           sortedSections,
           copyField,
+          dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
           onStateChange,
           onRefresh,
         })
@@ -557,6 +574,7 @@ function buildEntryCard({
   lang,
   sortedSections,
   copyField,
+  dupInfo = null,
   onStateChange,
   onRefresh,
 }) {
@@ -581,7 +599,8 @@ function buildEntryCard({
 
   if (isSelecting) {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('input[type="checkbox"]')) return;
+      // Allow clicking Eye reveal / Copy buttons or checkbox directly without double-toggling
+      if (e.target.closest('button, input, a')) return;
       e.preventDefault();
       e.stopPropagation();
       toggleThisSelection();
@@ -673,7 +692,26 @@ function buildEntryCard({
     el('span', null, t(lang, 'edit'))
   );
 
-  // Card Top Header (Title Pill + Quick Inline Actions)
+  const deleteIconBtn = el(
+    'button',
+    {
+      type: 'button',
+      class: 'vault-mini-action vault-mini-delete',
+      'data-testid': 'card-delete-btn',
+      'aria-label': `${t(lang, 'delete')} ${d.title}`,
+      title: t(lang, 'delete'),
+      onClick: async () => {
+        triggerHaptic(14);
+        await session.trashRecord(entry.id);
+        showToast(`${t(lang, 'movedToTrashToast')}: ${d.title || ''}`, 'info');
+        await onRefresh();
+      },
+    },
+    svgIcon('trash', 13),
+    el('span', null, t(lang, 'delete'))
+  );
+
+  // Card Top Header (Title Pill + Quick Inline Actions including Outside Delete!)
   const titlePill = el(
     'div',
     { class: 'vault-card-title-pill' },
@@ -687,10 +725,28 @@ function buildEntryCard({
     selectCheckbox,
     titlePill,
     !state.showTrash && !isSelecting
-      ? el('div', { class: 'vault-card-actions' }, favBtn, moveIconBtn, editIconBtn)
+      ? el('div', { class: 'vault-card-actions' }, favBtn, moveIconBtn, editIconBtn, deleteIconBtn)
       : null
   );
   card.appendChild(topRow);
+
+  // Practical Per-Section Duplicate Reason Badges (visible when Duplicates filter is active)
+  if (!state.showTrash && state.duplicatesOnly && dupInfo && dupInfo.reasons?.length > 0) {
+    const dupRow = el(
+      'div',
+      { class: 'vault-dup-tags' },
+      ...dupInfo.reasons.map((r) => {
+        const label =
+          r.type === 'username'
+            ? t(lang, 'dupReasonUser')
+            : r.type === 'password'
+              ? t(lang, 'dupReasonPass')
+              : t(lang, 'dupReasonTitle');
+        return el('span', { class: 'vault-dup-tag' }, `⚠ ${label} (×${r.count})`);
+      })
+    );
+    card.appendChild(dupRow);
+  }
 
   // Trash actions if in trash view
   if (state.showTrash) {
@@ -727,103 +783,101 @@ function buildEntryCard({
     return card;
   }
 
-  // Clean Glass Field Rows inside Card (hidden in multi-select for compact picking)
-  if (!isSelecting) {
-    const rowsWrap = el('div', { class: 'vault-card-rows' });
+  // Clean Glass Field Rows inside Card — ALWAYS visible (including during Multi-Select & Bulk Move!)
+  const rowsWrap = el('div', { class: 'vault-card-rows' });
 
-    // Row 1: Username / Bill Number (or Notes preview if no username)
-    const primaryVal = d.username || (!d.password && d.notes ? d.notes : '');
-    if (primaryVal) {
-      rowsWrap.appendChild(
+  // Row 1: Username / Bill Number (or Notes preview if no username)
+  const primaryVal = d.username || (!d.password && d.notes ? d.notes : '');
+  if (primaryVal) {
+    rowsWrap.appendChild(
+      el(
+        'div',
+        { class: 'vault-field-pill' },
+        el('span', { class: 'vault-field-icon vault-field-icon-user', 'aria-hidden': 'true' }, '👤'),
+        el('span', { class: 'vault-field-val ltr-value' }, primaryVal),
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'vault-pill-btn',
+            'aria-label': `${t(lang, 'copyUser')} ${d.title}`,
+            title: t(lang, 'copyUser'),
+            onClick: () => copyField(primaryVal, t(lang, 'usernameLabel')),
+          },
+          svgIcon('copy', 15)
+        )
+      )
+    );
+  }
+
+  // Row 2: Password (ONLY when present — optional for Bills!) with OUTSIDE Eye reveal toggle + Copy
+  if (d.password) {
+    const maskedText = '••••••••••';
+    let isRevealed = false;
+    let autoHideTimer = null;
+    const pwdSpan = el('span', { class: 'vault-field-val ltr-value' }, maskedText);
+
+    const hidePwd = () => {
+      if (autoHideTimer) {
+        clearTimeout(autoHideTimer);
+        autoHideTimer = null;
+      }
+      isRevealed = false;
+      pwdSpan.textContent = maskedText;
+      eyeBtn.classList.remove('is-revealed');
+    };
+
+    const eyeBtn = el(
+      'button',
+      {
+        type: 'button',
+        class: 'vault-pill-btn',
+        'aria-label': `${t(lang, 'revealToggle')} ${d.title}`,
+        title: t(lang, 'revealToggle'),
+        onClick: () => {
+          triggerHaptic(8);
+          if (isRevealed) {
+            hidePwd();
+          } else {
+            isRevealed = true;
+            pwdSpan.textContent = d.password;
+            eyeBtn.classList.add('is-revealed');
+            if (autoHideTimer) clearTimeout(autoHideTimer);
+            autoHideTimer = setTimeout(hidePwd, 15000);
+          }
+        },
+      },
+      svgIcon('eye', 15)
+    );
+
+    rowsWrap.appendChild(
+      el(
+        'div',
+        { class: 'vault-field-pill' },
+        el('span', { class: 'vault-field-icon vault-field-icon-key', 'aria-hidden': 'true' }, '🔑'),
+        pwdSpan,
         el(
           'div',
-          { class: 'vault-field-pill' },
-          el('span', { class: 'vault-field-icon vault-field-icon-user', 'aria-hidden': 'true' }, '👤'),
-          el('span', { class: 'vault-field-val ltr-value' }, primaryVal),
+          { class: 'vault-pill-btns' },
+          eyeBtn,
           el(
             'button',
             {
               type: 'button',
               class: 'vault-pill-btn',
-              'aria-label': `${t(lang, 'copyUser')} ${d.title}`,
-              title: t(lang, 'copyUser'),
-              onClick: () => copyField(primaryVal, t(lang, 'usernameLabel')),
+              'aria-label': `${t(lang, 'copyPass')} ${d.title}`,
+              title: t(lang, 'copyPass'),
+              onClick: () => copyField(d.password, t(lang, 'passwordLabel')),
             },
             svgIcon('copy', 15)
           )
         )
-      );
-    }
+      )
+    );
+  }
 
-    // Row 2: Password (ONLY when present — optional for Bills!) with OUTSIDE Eye reveal toggle + Copy
-    if (d.password) {
-      const maskedText = '••••••••••';
-      let isRevealed = false;
-      let autoHideTimer = null;
-      const pwdSpan = el('span', { class: 'vault-field-val ltr-value' }, maskedText);
-
-      const hidePwd = () => {
-        if (autoHideTimer) {
-          clearTimeout(autoHideTimer);
-          autoHideTimer = null;
-        }
-        isRevealed = false;
-        pwdSpan.textContent = maskedText;
-        eyeBtn.classList.remove('is-revealed');
-      };
-
-      const eyeBtn = el(
-        'button',
-        {
-          type: 'button',
-          class: 'vault-pill-btn',
-          'aria-label': `${t(lang, 'revealToggle')} ${d.title}`,
-          title: t(lang, 'revealToggle'),
-          onClick: () => {
-            triggerHaptic(8);
-            if (isRevealed) {
-              hidePwd();
-            } else {
-              isRevealed = true;
-              pwdSpan.textContent = d.password;
-              eyeBtn.classList.add('is-revealed');
-              if (autoHideTimer) clearTimeout(autoHideTimer);
-              autoHideTimer = setTimeout(hidePwd, 15000);
-            }
-          },
-        },
-        svgIcon('eye', 15)
-      );
-
-      rowsWrap.appendChild(
-        el(
-          'div',
-          { class: 'vault-field-pill' },
-          el('span', { class: 'vault-field-icon vault-field-icon-key', 'aria-hidden': 'true' }, '🔑'),
-          pwdSpan,
-          el(
-            'div',
-            { class: 'vault-pill-btns' },
-            eyeBtn,
-            el(
-              'button',
-              {
-                type: 'button',
-                class: 'vault-pill-btn',
-                'aria-label': `${t(lang, 'copyPass')} ${d.title}`,
-                title: t(lang, 'copyPass'),
-                onClick: () => copyField(d.password, t(lang, 'passwordLabel')),
-              },
-              svgIcon('copy', 15)
-            )
-          )
-        )
-      );
-    }
-
-    if (rowsWrap.childNodes.length > 0) {
-      card.appendChild(rowsWrap);
-    }
+  if (rowsWrap.childNodes.length > 0) {
+    card.appendChild(rowsWrap);
   }
 
   return card;
@@ -885,12 +939,13 @@ function openMoveEntrySheet({ session, lang, entry, sections, onRefresh }) {
         e.preventDefault();
         const name = newSecIn.value.trim();
         if (!name) return;
+        const nextTheme = pickNextUnusedSectionTheme(sections, SECTION_EMOJIS);
         const created = await session.saveRecord({
           type: 'section',
           data: {
             name,
-            emoji: '📁',
-            color: SECTION_COLOR_OPTIONS[sections.length % SECTION_COLOR_OPTIONS.length].hex,
+            emoji: nextTheme.emoji,
+            color: nextTheme.hex,
             order: sections.length,
           },
         });
@@ -953,12 +1008,13 @@ function openBulkMoveSheet({ session, lang, selectedIds, sections, onStateChange
         e.preventDefault();
         const name = newSecIn.value.trim();
         if (!name) return;
+        const nextTheme = pickNextUnusedSectionTheme(sections, SECTION_EMOJIS);
         const created = await session.saveRecord({
           type: 'section',
           data: {
             name,
-            emoji: '📁',
-            color: SECTION_COLOR_OPTIONS[sections.length % SECTION_COLOR_OPTIONS.length].hex,
+            emoji: nextTheme.emoji,
+            color: nextTheme.hex,
             order: sections.length,
           },
         });
@@ -1185,6 +1241,7 @@ function openManageSectionsSheet({ session, lang, sections, passwords, onRefresh
   const renderList = () => {
     while (host.firstChild) host.removeChild(host.firstChild);
 
+    const nextTheme = pickNextUnusedSectionTheme(currentSections, SECTION_EMOJIS);
     const nameIn = el('input', {
       type: 'text',
       class: 'input',
@@ -1195,12 +1252,14 @@ function openManageSectionsSheet({ session, lang, sections, passwords, onRefresh
     const emojiSel = el(
       'select',
       { class: 'select', 'aria-label': 'Emoji' },
-      ...SECTION_EMOJIS.map((em) => el('option', { value: em }, em))
+      ...SECTION_EMOJIS.map((em) => el('option', { value: em, selected: em === nextTheme.emoji }, em))
     );
     const colorSel = el(
       'select',
       { class: 'select', 'aria-label': 'Color' },
-      ...SECTION_COLOR_OPTIONS.map((c) => el('option', { value: c.hex }, lang === 'en' ? c.nameEn : c.nameAr))
+      ...SECTION_COLOR_OPTIONS.map((c) =>
+        el('option', { value: c.hex, selected: c.hex === nextTheme.hex }, lang === 'en' ? c.nameEn : c.nameAr)
+      )
     );
 
     const addForm = el(

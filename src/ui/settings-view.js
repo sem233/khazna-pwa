@@ -406,7 +406,7 @@ export function renderSettingsView({
       'div',
       { class: 'settings-row' },
       el('span', { class: 'settings-row-title' }, t(lang, 'appVersionLabel')),
-      el('span', { class: 'settings-row-desc ltr-inline mono' }, `v${integrityInfo?.version || '2.5.0'} • ${kdfInfo}`)
+      el('span', { class: 'settings-row-desc ltr-inline mono' }, `v${integrityInfo?.version || '2.6.0'} • ${kdfInfo}`)
     )
   );
   pwaCard.appendChild(
