@@ -4,5 +4,5 @@
  */
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('خزنة (Khazna) Chrome Extension v2.6.0 ready — 100% offline.');
+  console.log('خزنة (Khazna) Chrome Extension v2.7.0 ready — 100% offline.');
 });

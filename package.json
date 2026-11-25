@@ -1,6 +1,6 @@
 {
   "name": "khazna",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "خزنة (Khazna) — مدير كلمات مرور محلي ١٠٠٪ بتشفير صفري المعرفة يعمل على الأندرويد والكمبيوتر وإضافة كروم",
   "private": true,
   "type": "module",

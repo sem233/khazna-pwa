@@ -2489,3 +2489,148 @@ html.overlay-mode .section-group-body.vault-cards-grid {
   grid-template-columns: 1fr;
   gap: 10px;
 }
+
+/* ==========================================================================
+   v2.7.0 Side-by-Side Exact Duplicate Groups & Origin Section Badges
+   ========================================================================== */
+
+.dup-group-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(155deg, rgba(64, 18, 34, 0.44) 0%, rgba(14, 20, 42, 0.68) 100%);
+  backdrop-filter: var(--blur-lg);
+  -webkit-backdrop-filter: var(--blur-lg);
+  border: 1.5px solid rgba(251, 113, 133, 0.42);
+  box-shadow: 0 14px 34px -14px rgba(2, 6, 23, 0.8), 0 0 24px -8px rgba(244, 63, 94, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.dup-group-box.is-cross-section {
+  border-color: rgba(251, 191, 36, 0.62);
+  background: linear-gradient(155deg, rgba(68, 42, 12, 0.44) 0%, rgba(44, 18, 36, 0.46) 45%, rgba(14, 20, 42, 0.72) 100%);
+  box-shadow: 0 14px 34px -14px rgba(2, 6, 23, 0.82), 0 0 28px -6px rgba(251, 191, 36, 0.38), inset 0 1px 0 rgba(254, 240, 138, 0.2);
+}
+
+.dup-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(148, 179, 224, 0.16);
+}
+
+.dup-group-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.dup-group-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dup-group-user {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(10, 16, 34, 0.62);
+  border: 1px solid rgba(148, 179, 224, 0.22);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dup-cross-banner {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fde68a;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Side-by-side cards inside each duplicate group */
+.dup-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 12px;
+}
+
+/* Clear "From section: <emoji> <name>" badge on each duplicate card */
+.vault-origin-badge {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 11px;
+  background: var(--sec-badge-bg, rgba(56, 189, 248, 0.18));
+  border: 1px solid var(--sec-border, rgba(56, 189, 248, 0.4));
+  border-inline-start: 3px solid var(--sec-accent, #38bdf8);
+  font-size: 0.8rem;
+  color: var(--sec-badge-color, var(--text-primary));
+}
+
+.vault-origin-label {
+  opacity: 0.88;
+  font-weight: 600;
+}
+
+.vault-origin-name {
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.vault-dup-delete-btn {
+  position: relative;
+  z-index: 1;
+  margin-top: 2px;
+}
+
+/* Light theme adaptations for duplicate groups */
+:root[data-theme="light"] .dup-group-box {
+  background: linear-gradient(155deg, rgba(255, 228, 230, 0.78) 0%, rgba(255, 255, 255, 0.86) 100%);
+  border-color: rgba(244, 63, 94, 0.45);
+  box-shadow: 0 12px 28px -12px rgba(190, 18, 60, 0.16);
+}
+
+:root[data-theme="light"] .dup-group-box.is-cross-section {
+  background: linear-gradient(155deg, rgba(254, 243, 199, 0.84) 0%, rgba(255, 228, 230, 0.72) 50%, rgba(255, 255, 255, 0.88) 100%);
+  border-color: rgba(217, 119, 6, 0.55);
+}
+
+:root[data-theme="light"] .dup-group-user {
+  background: rgba(255, 255, 255, 0.86);
+  border-color: rgba(15, 23, 42, 0.14);
+}
+
+:root[data-theme="light"] .dup-cross-banner {
+  color: #b45309;
+}
+
+@media (max-width: 680px) {
+  .dup-group-box {
+    padding: 12px;
+  }
+  .dup-group-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+html.chrome-popup-mode .dup-group-grid,
+html.overlay-mode .dup-group-grid {
+  grid-template-columns: 1fr;
+}

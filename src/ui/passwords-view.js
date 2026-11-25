@@ -11,7 +11,7 @@
  */
 
 import { evaluatePasswordStrength } from '../crypto/vault-crypto.js';
-import { analyzeSectionDuplicates, filterAndSortPasswords } from '../domain/search.js';
+import { analyzeDuplicateGroups, filterAndSortPasswords, matchesQuery } from '../domain/search.js';
 import { formatError, t } from '../i18n/strings.js';
 import {
   accentClassForHex,
@@ -59,12 +59,12 @@ export function renderPasswordsView({
   }
   const sortedSections = [...sections].sort((a, b) => (a.data?.order ?? 0) - (b.data?.order ?? 0));
 
-  // Practical Per-Section Duplicate Analysis (computed strictly within each section)
-  const dupAnalysis = analyzeSectionDuplicates(passwords);
-  const activeDupCount =
-    state.sectionId && state.sectionId !== 'all'
-      ? dupAnalysis.countBySection.get(state.sectionId) || 0
-      : dupAnalysis.totalCount;
+  // Exact Credential Duplicate Analysis (strictly identical username + password)
+  // - Inside a specific section: finds duplicates within THAT section.
+  // - On "All Accounts": finds duplicates GLOBALLY even across DIFFERENT sections!
+  const activeScope = state.showTrash ? 'all' : (state.sectionId || 'all');
+  const dupAnalysis = analyzeDuplicateGroups(passwords, { scopeSectionId: activeScope });
+  const activeDupCount = dupAnalysis.totalCount;
 
   // --- 1) Equal-Sized Uniform Glass Grid for ALL Sections (Distinct Theme per Section!) ---
   const secGrid = el('section', {
@@ -73,7 +73,7 @@ export function renderPasswordsView({
     'aria-label': t(lang, 'manageSections'),
   });
 
-  // "All Accounts" equal tile
+  // "All Accounts" equal tile (shows global duplicate count including cross-section!)
   const isAllActive =
     !state.showTrash && !state.favoritesOnly && !state.duplicatesOnly && state.sectionId === 'all';
   secGrid.appendChild(
@@ -91,8 +91,8 @@ export function renderPasswordsView({
         'div',
         { class: 'sec-tile-top' },
         el('span', { class: 'sec-tile-name' }, `✨ ${t(lang, 'totalAccountsKpi')}`),
-        dupAnalysis.totalCount > 0
-          ? el('span', { class: 'sec-tile-dup', title: t(lang, 'duplicates') }, `⚠ ${dupAnalysis.totalCount}`)
+        dupAnalysis.globalTotalCount > 0
+          ? el('span', { class: 'sec-tile-dup', title: t(lang, 'duplicates') }, `⚠ ${dupAnalysis.globalTotalCount}`)
           : null
       ),
       el('strong', { class: 'sec-tile-num ltr-inline' }, String(passwords.length))
@@ -408,17 +408,128 @@ export function renderPasswordsView({
     );
   }
 
-  // --- 6) Cards Grid ---
+  // --- 6) Cards Grid / Side-by-Side Duplicate Groups ---
   const listWrap = el('div', { class: 'entry-list', 'data-testid': 'password-list' });
+
+  // Dedicated Side-by-Side Duplicate Groups View (strictly matching username + password)
+  if (!state.showTrash && state.duplicatesOnly) {
+    const visibleGroups = state.query
+      ? dupAnalysis.groups.filter((grp) =>
+          grp.entries.some((e) => {
+            const d = e.data || {};
+            return matchesQuery(state.query, [d.title, d.username, d.notes]);
+          })
+        )
+      : dupAnalysis.groups;
+
+    if (visibleGroups.length === 0) {
+      listWrap.appendChild(
+        el(
+          'div',
+          { class: 'glass-card empty-state' },
+          svgIcon('check', 36),
+          el('h3', null, t(lang, 'dupNoneInSection'))
+        )
+      );
+      container.appendChild(listWrap);
+      return container;
+    }
+
+    for (const grp of visibleGroups) {
+      const involvedSectionNames = grp.sectionIds
+        .map((sid) => {
+          const s = sectionById.get(sid);
+          return s
+            ? `${s.data?.emoji || '📁'} ${s.data?.name || ''}`
+            : (lang === 'en' ? '📁 Uncategorized' : '📁 غير مصنّف');
+        })
+        .join(' • ');
+
+      const groupCardsGrid = el('div', { class: 'dup-group-grid' });
+      for (const entry of grp.entries) {
+        groupCardsGrid.appendChild(
+          buildEntryCard({
+            entry,
+            sectionById,
+            selectedIds,
+            state,
+            session,
+            lang,
+            sortedSections,
+            copyField,
+            isDupComparison: true,
+            onStateChange,
+            onRefresh,
+          })
+        );
+      }
+
+      const keepOneBtn = el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-sm btn-danger',
+          'data-testid': 'dup-keep-one-btn',
+          onClick: async () => {
+            triggerHaptic(16);
+            const extras = grp.entries.slice(1);
+            for (const ex of extras) {
+              await session.trashRecord(ex.id);
+            }
+            showToast(`${t(lang, 'movedToTrashToast')} (${extras.length})`, 'info');
+            await onRefresh();
+          },
+        },
+        svgIcon('trash', 14),
+        `${t(lang, 'keepOneDeleteExtrasBtn')} (${grp.entries.length - 1})`
+      );
+
+      const groupBox = el(
+        'section',
+        {
+          class: `dup-group-box ${grp.isCrossSection ? 'is-cross-section' : ''}`.trim(),
+          'data-testid': 'dup-group-box',
+        },
+        el(
+          'div',
+          { class: 'dup-group-head' },
+          el(
+            'div',
+            { class: 'dup-group-meta' },
+            el(
+              'div',
+              { class: 'dup-group-title-row' },
+              el('span', { class: 'vault-dup-tag' }, `⚠ ${t(lang, 'dupGroupTitle')} (×${grp.entries.length})`),
+              el('span', { class: 'dup-group-user ltr-value' }, `👤 ${grp.username}`)
+            ),
+            grp.isCrossSection
+              ? el(
+                  'div',
+                  { class: 'dup-cross-banner' },
+                  `🔀 ${t(lang, 'dupCrossSectionBadge')}: ${involvedSectionNames}`
+                )
+              : null
+          ),
+          keepOneBtn
+        ),
+        groupCardsGrid
+      );
+
+      listWrap.appendChild(groupBox);
+    }
+
+    container.appendChild(listWrap);
+    return container;
+  }
 
   if (visibleEntries.length === 0) {
     listWrap.appendChild(
       el(
         'div',
         { class: 'glass-card empty-state' },
-        svgIcon(state.duplicatesOnly ? 'check' : 'lock', 36),
-        el('h3', null, state.duplicatesOnly ? t(lang, 'dupNoneInSection') : t(lang, 'emptyPasswords')),
-        state.duplicatesOnly ? null : el('p', null, t(lang, 'emptyPasswordsSub'))
+        svgIcon('lock', 36),
+        el('h3', null, t(lang, 'emptyPasswords')),
+        el('p', null, t(lang, 'emptyPasswordsSub'))
       )
     );
     container.appendChild(listWrap);
@@ -464,7 +575,6 @@ export function renderPasswordsView({
             lang,
             sortedSections,
             copyField,
-            dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
             onStateChange,
             onRefresh,
           })
@@ -509,7 +619,6 @@ export function renderPasswordsView({
             lang,
             sortedSections,
             copyField,
-            dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
             onStateChange,
             onRefresh,
           })
@@ -552,7 +661,6 @@ export function renderPasswordsView({
           lang,
           sortedSections,
           copyField,
-          dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
           onStateChange,
           onRefresh,
         })
@@ -574,7 +682,7 @@ function buildEntryCard({
   lang,
   sortedSections,
   copyField,
-  dupInfo = null,
+  isDupComparison = false,
   onStateChange,
   onRefresh,
 }) {
@@ -730,22 +838,19 @@ function buildEntryCard({
   );
   card.appendChild(topRow);
 
-  // Practical Per-Section Duplicate Reason Badges (visible when Duplicates filter is active)
-  if (!state.showTrash && state.duplicatesOnly && dupInfo && dupInfo.reasons?.length > 0) {
-    const dupRow = el(
-      'div',
-      { class: 'vault-dup-tags' },
-      ...dupInfo.reasons.map((r) => {
-        const label =
-          r.type === 'username'
-            ? t(lang, 'dupReasonUser')
-            : r.type === 'password'
-              ? t(lang, 'dupReasonPass')
-              : t(lang, 'dupReasonTitle');
-        return el('span', { class: 'vault-dup-tag' }, `⚠ ${label} (×${r.count})`);
-      })
+  // Origin Section Badge inside Side-by-Side Duplicate Groups ("من قسم: <emoji> <section>")
+  if (!state.showTrash && isDupComparison) {
+    const originName = sec
+      ? `${sec.data?.emoji || '📁'} ${sec.data?.name || ''}`
+      : (lang === 'en' ? '📁 Uncategorized' : '📁 غير مصنّف');
+    card.appendChild(
+      el(
+        'div',
+        { class: 'vault-origin-badge', 'data-testid': 'dup-origin-badge' },
+        el('span', { class: 'vault-origin-label' }, t(lang, 'fromSectionLabel')),
+        el('strong', { class: 'vault-origin-name' }, originName)
+      )
     );
-    card.appendChild(dupRow);
   }
 
   // Trash actions if in trash view
@@ -878,6 +983,28 @@ function buildEntryCard({
 
   if (rowsWrap.childNodes.length > 0) {
     card.appendChild(rowsWrap);
+  }
+
+  // Prominent 1-Click "Delete This Copy" button right on every card inside a Duplicate Group
+  if (isDupComparison && !state.showTrash && !isSelecting) {
+    card.appendChild(
+      el(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-sm btn-danger btn-block vault-dup-delete-btn',
+          'data-testid': 'dup-delete-copy-btn',
+          onClick: async () => {
+            triggerHaptic(14);
+            await session.trashRecord(entry.id);
+            showToast(`${t(lang, 'movedToTrashToast')}: ${d.title || ''}`, 'info');
+            await onRefresh();
+          },
+        },
+        svgIcon('trash', 14),
+        t(lang, 'deleteThisCopyBtn')
+      )
+    );
   }
 
   return card;

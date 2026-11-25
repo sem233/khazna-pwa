@@ -37,7 +37,9 @@ export function matchesQuery(query, fields) {
 
 /**
  * Filters and sorts password entries locally.
- * - Duplicates are strictly analyzed PER SECTION so each section identifies its own real duplicates.
+ * - Duplicates match STRICTLY when BOTH username AND password are identical.
+ * - When sectionId === 'all', duplicates are detected across ALL sections (cross-section + same-section).
+ * - When a specific sectionId is selected, duplicates are detected strictly inside that section.
  */
 export function filterAndSortPasswords(
   entries,
@@ -49,7 +51,9 @@ export function filterAndSortPasswords(
     sortBy = 'updated-desc',
   } = {}
 ) {
-  const dupAnalysis = duplicatesOnly ? analyzeSectionDuplicates(entries) : null;
+  const dupAnalysis = duplicatesOnly
+    ? analyzeDuplicateGroups(entries, { scopeSectionId: sectionId })
+    : null;
 
   const filtered = entries.filter((entry) => {
     const d = entry.data || {};
@@ -65,14 +69,11 @@ export function filterAndSortPasswords(
   filtered.sort((a, b) => {
     const da = a.data || {};
     const db = b.data || {};
-    // When viewing duplicates, group identical duplicate clusters side-by-side within each section
     if (dupAnalysis) {
-      const ia = dupAnalysis.byEntryId.get(a.id);
-      const ib = dupAnalysis.byEntryId.get(b.id);
-      const secCmp = String(ia?.sectionId || '').localeCompare(String(ib?.sectionId || ''));
-      if (secCmp !== 0) return secCmp;
-      const clusterCmp = String(ia?.clusterKey || '').localeCompare(String(ib?.clusterKey || ''));
-      if (clusterCmp !== 0) return clusterCmp;
+      const ka = dupAnalysis.groupKeyByEntryId.get(a.id) || '';
+      const kb = dupAnalysis.groupKeyByEntryId.get(b.id) || '';
+      const grpCmp = ka.localeCompare(kb);
+      if (grpCmp !== 0) return grpCmp;
     }
     // Favorites / pinned items ALWAYS appear at the top of their section
     if (Boolean(da.favorite) !== Boolean(db.favorite)) {
@@ -95,112 +96,124 @@ export function filterAndSortPasswords(
 }
 
 /**
- * Practical Per-Section Duplicate Analyzer.
- * Checks strictly WITHIN each section for real duplicates:
- * 1. Same normalized username / email / bill number (length >= 2)
- * 2. Same non-empty password (length >= 3)
- * 3. Same normalized title (length >= 2)
- *
- * Returns:
- * - byEntryId: Map<id, { sectionId, reasons: Array<{ type, count, clusterKey }>, clusterKey }>
- * - countBySection: Map<sectionId, number>
- * - duplicateIds: Set<id>
- * - totalCount: number
+ * Builds the strict exact-duplicate key: BOTH normalized username AND exact password must match.
+ * Returns null if username is empty (so empty entries or password-only matches are never flagged).
  */
-export function analyzeSectionDuplicates(entries) {
-  const bySection = new Map();
-  for (const entry of entries) {
-    const sid = entry.data?.sectionId || 'uncategorized';
-    if (!bySection.has(sid)) bySection.set(sid, []);
-    bySection.get(sid).push(entry);
+export function getExactCredentialKey(entry) {
+  const d = entry?.data || {};
+  const normUser = normalizeSearchText(d.username);
+  const pwd = String(d.password || '');
+  if (!normUser) return null;
+  return `${normUser}\u0000${pwd}`;
+}
+
+/**
+ * Groups duplicate entries strictly by identical (username + password).
+ *
+ * - scopeSectionId === 'all': groups duplicates across ALL sections (including cross-section duplicates!).
+ * - scopeSectionId === <id>: groups duplicates strictly inside that single section.
+ *
+ * Also computes `countBySection` (exact duplicate count strictly inside each individual section)
+ * so every section tile shows its own internal duplicate count, while `globalTotalCount` shows
+ * all duplicates across all sections for the "All / إجمالي الحسابات" view.
+ */
+export function analyzeDuplicateGroups(entries, { scopeSectionId = 'all' } = {}) {
+  const scopedEntries =
+    scopeSectionId && scopeSectionId !== 'all'
+      ? entries.filter((e) => (e.data?.sectionId || 'uncategorized') === scopeSectionId)
+      : entries;
+
+  const map = new Map();
+  for (const entry of scopedEntries) {
+    const key = getExactCredentialKey(entry);
+    if (!key) continue;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(entry);
   }
 
-  const byEntryId = new Map();
-  const countBySection = new Map();
+  const groups = [];
   const duplicateIds = new Set();
+  const groupKeyByEntryId = new Map();
 
-  const registerReason = (entryId, sectionId, reason) => {
-    duplicateIds.add(entryId);
-    let info = byEntryId.get(entryId);
-    if (!info) {
-      info = { sectionId, reasons: [], clusterKey: reason.clusterKey };
-      byEntryId.set(entryId, info);
+  for (const [key, list] of map.entries()) {
+    if (list.length < 2) continue;
+    // Sort entries inside each duplicate group: newest updated first so the first item is the freshest copy
+    const sorted = [...list].sort((a, b) =>
+      String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))
+    );
+    const sectionIds = [...new Set(sorted.map((e) => e.data?.sectionId || 'uncategorized'))];
+    const group = {
+      key,
+      username: sorted[0].data?.username || '',
+      hasPassword: Boolean(sorted[0].data?.password),
+      entries: sorted,
+      sectionIds,
+      isCrossSection: sectionIds.length > 1,
+    };
+    groups.push(group);
+    for (const e of sorted) {
+      duplicateIds.add(e.id);
+      groupKeyByEntryId.set(e.id, key);
     }
-    if (!info.reasons.some((r) => r.type === reason.type)) {
-      info.reasons.push(reason);
-    }
-  };
+  }
 
-  for (const [sid, list] of bySection.entries()) {
-    const byUser = new Map();
-    const byPwd = new Map();
-    const byTitle = new Map();
+  // Sort groups: cross-section duplicates first when in 'all' view, then largest group first
+  groups.sort((a, b) => {
+    if (a.isCrossSection !== b.isCrossSection) return a.isCrossSection ? -1 : 1;
+    return b.entries.length - a.entries.length;
+  });
 
-    for (const entry of list) {
-      const d = entry.data || {};
-      const normUser = normalizeSearchText(d.username);
-      const pwd = String(d.password || '');
-      const normTitle = normalizeSearchText(d.title);
+  // Also compute internal duplicate count strictly inside each section (for individual section tiles)
+  const countBySection = new Map();
+  const perSecBuckets = new Map();
+  for (const entry of entries) {
+    const sid = entry.data?.sectionId || 'uncategorized';
+    const key = getExactCredentialKey(entry);
+    if (!key) continue;
+    const secKey = `${sid}\u0001${key}`;
+    if (!perSecBuckets.has(secKey)) perSecBuckets.set(secKey, { sid, count: 0 });
+    perSecBuckets.get(secKey).count++;
+  }
+  for (const { sid, count } of perSecBuckets.values()) {
+    if (count >= 2) {
+      countBySection.set(sid, (countBySection.get(sid) || 0) + count);
+    }
+  }
 
-      if (normUser.length >= 2) {
-        if (!byUser.has(normUser)) byUser.set(normUser, []);
-        byUser.get(normUser).push(entry.id);
-      }
-      if (pwd.length >= 3) {
-        if (!byPwd.has(pwd)) byPwd.set(pwd, []);
-        byPwd.get(pwd).push(entry.id);
-      }
-      if (normTitle.length >= 2) {
-        if (!byTitle.has(normTitle)) byTitle.set(normTitle, []);
-        byTitle.get(normTitle).push(entry.id);
-      }
-    }
-
-    const secDupIds = new Set();
-
-    for (const [key, ids] of byUser.entries()) {
-      if (ids.length > 1) {
-        for (const id of ids) {
-          secDupIds.add(id);
-          registerReason(id, sid, { type: 'username', count: ids.length, clusterKey: `1-user:${key}` });
-        }
-      }
-    }
-    for (const [key, ids] of byPwd.entries()) {
-      if (ids.length > 1) {
-        for (const id of ids) {
-          secDupIds.add(id);
-          registerReason(id, sid, { type: 'password', count: ids.length, clusterKey: `2-pwd:${key}` });
-        }
-      }
-    }
-    for (const [key, ids] of byTitle.entries()) {
-      if (ids.length > 1) {
-        for (const id of ids) {
-          secDupIds.add(id);
-          registerReason(id, sid, { type: 'title', count: ids.length, clusterKey: `3-title:${key}` });
-        }
-      }
-    }
-
-    if (secDupIds.size > 0) {
-      countBySection.set(sid, secDupIds.size);
-    }
+  // Compute global duplicate count across ALL sections (for the "All Accounts" tile)
+  const globalBuckets = new Map();
+  for (const entry of entries) {
+    const key = getExactCredentialKey(entry);
+    if (!key) continue;
+    globalBuckets.set(key, (globalBuckets.get(key) || 0) + 1);
+  }
+  let globalTotalCount = 0;
+  for (const cnt of globalBuckets.values()) {
+    if (cnt >= 2) globalTotalCount += cnt;
   }
 
   return {
-    byEntryId,
-    countBySection,
+    groups,
     duplicateIds,
+    groupKeyByEntryId,
+    countBySection,
+    globalTotalCount,
     totalCount: duplicateIds.size,
   };
 }
 
 /**
- * Backward-compatible helper returning the Set of per-section duplicate entry IDs.
+ * Backward-compatible alias returning per-section/global duplicate analysis.
  */
-export function findDuplicateEntryIds(entries) {
-  return analyzeSectionDuplicates(entries).duplicateIds;
+export function analyzeSectionDuplicates(entries, opts = {}) {
+  return analyzeDuplicateGroups(entries, opts);
+}
+
+/**
+ * Backward-compatible helper returning the Set of exact duplicate entry IDs (same username + password).
+ */
+export function findDuplicateEntryIds(entries, scopeSectionId = 'all') {
+  return analyzeDuplicateGroups(entries, { scopeSectionId }).duplicateIds;
 }
 
 export function extractHost(rawUrl) {

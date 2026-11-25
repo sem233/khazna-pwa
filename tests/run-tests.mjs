@@ -38,7 +38,7 @@ import {
 import { createMemoryBackend, VaultStorage } from '../src/storage/idb.js';
 import { ClipboardGuard, VaultSession } from '../src/auth/session.js';
 import { detectCardBrand, maskCardNumber, validateLuhn } from '../src/domain/cards.js';
-import { analyzeSectionDuplicates, filterAndSortPasswords } from '../src/domain/search.js';
+import { analyzeDuplicateGroups, filterAndSortPasswords } from '../src/domain/search.js';
 import { computeVaultAuditAndStats } from '../src/domain/audit.js';
 import {
   exportBitwardenJson,
@@ -315,28 +315,45 @@ await test('Domain: Card brand detection, Luhn, masking, Arabic search & audit',
   const stats = computeVaultAuditAndStats({ sections: [], passwords: list, cards: [], notes: [] });
   assert.equal(stats.audit.reusedCount, 2);
 
-  // Per-section duplicate detection:
-  // Identical username/password in DIFFERENT sections must NOT cross-contaminate,
-  // while duplicates INSIDE the same section MUST be detected with exact reasons.
+  // Exact Credential Duplicate Grouping (STRICTLY identical username + identical password):
+  // 1) Same user + DIFFERENT password => NOT duplicate
+  // 2) DIFFERENT user + same password => NOT duplicate
+  // 3) Same user + SAME password in SAME section => grouped in that section AND in 'all'
+  // 4) Same user + SAME password across DIFFERENT sections => grouped in 'all' as cross-section!
   const dupList = [
-    { id: 'a1', data: { title: 'FB 1', username: '01099999999', password: 'pw1', sectionId: 'sec-fb' } },
-    { id: 'a2', data: { title: 'FB Old', username: '01099999999', password: 'pw2', sectionId: 'sec-fb' } },
-    { id: 'b1', data: { title: 'Electric Bill', username: '01099999999', password: '', sectionId: 'sec-bills' } },
-    { id: 'c1', data: { title: 'Work Mail', username: 'a@co.com', password: 'SharedPass#1', sectionId: 'sec-work' } },
-    { id: 'c2', data: { title: 'Work VPN', username: 'b@co.com', password: 'SharedPass#1', sectionId: 'sec-work' } },
+    { id: 'a1', data: { title: 'FB 1', username: '01099999999', password: 'SamePass#1', sectionId: 'sec-fb' }, updatedAt: '2026-02-01' },
+    { id: 'a2', data: { title: 'FB Copy', username: '01099999999', password: 'SamePass#1', sectionId: 'sec-fb' }, updatedAt: '2026-02-02' },
+    { id: 'a3', data: { title: 'FB Diff Pass', username: '01099999999', password: 'OtherPass#2', sectionId: 'sec-fb' }, updatedAt: '2026-02-03' },
+    { id: 'a4', data: { title: 'FB Diff User', username: '01088888888', password: 'SamePass#1', sectionId: 'sec-fb' }, updatedAt: '2026-02-04' },
+    { id: 'x1', data: { title: 'Cross Copy 1', username: 'osama@mail.com', password: 'CrossPass#9', sectionId: 'sec-general' }, updatedAt: '2026-02-05' },
+    { id: 'x2', data: { title: 'Cross Copy 2', username: 'osama@mail.com', password: 'CrossPass#9', sectionId: 'sec-work' }, updatedAt: '2026-02-06' },
   ];
-  const dupAnalysis = analyzeSectionDuplicates(dupList);
-  assert.equal(dupAnalysis.countBySection.get('sec-fb'), 2);
-  assert.equal(dupAnalysis.countBySection.get('sec-bills'), undefined);
-  assert.equal(dupAnalysis.countBySection.get('sec-work'), 2);
-  assert.equal(dupAnalysis.duplicateIds.has('b1'), false);
-  assert.equal(dupAnalysis.byEntryId.get('a1').reasons[0].type, 'username');
-  assert.equal(dupAnalysis.byEntryId.get('c1').reasons[0].type, 'password');
 
-  const fbDups = filterAndSortPasswords(dupList, { sectionId: 'sec-fb', duplicatesOnly: true });
-  assert.equal(fbDups.length, 2);
-  const billsDups = filterAndSortPasswords(dupList, { sectionId: 'sec-bills', duplicatesOnly: true });
-  assert.equal(billsDups.length, 0);
+  // Scoped to sec-fb: ONLY a1 & a2 match (a3 has different pass, a4 has different user!)
+  const fbAnalysis = analyzeDuplicateGroups(dupList, { scopeSectionId: 'sec-fb' });
+  assert.equal(fbAnalysis.groups.length, 1);
+  assert.equal(fbAnalysis.groups[0].entries.length, 2);
+  assert.equal(fbAnalysis.duplicateIds.has('a1'), true);
+  assert.equal(fbAnalysis.duplicateIds.has('a2'), true);
+  assert.equal(fbAnalysis.duplicateIds.has('a3'), false);
+  assert.equal(fbAnalysis.duplicateIds.has('a4'), false);
+  assert.equal(fbAnalysis.countBySection.get('sec-fb'), 2);
+  assert.equal(fbAnalysis.countBySection.get('sec-general'), undefined);
+  assert.equal(fbAnalysis.countBySection.get('sec-work'), undefined);
+
+  // Scoped to 'all': collects BOTH the cross-section group (x1+x2) AND the same-section group (a1+a2)!
+  const allAnalysis = analyzeDuplicateGroups(dupList, { scopeSectionId: 'all' });
+  assert.equal(allAnalysis.groups.length, 2);
+  assert.equal(allAnalysis.globalTotalCount, 4);
+  const crossGrp = allAnalysis.groups.find((g) => g.isCrossSection);
+  assert.ok(crossGrp);
+  assert.equal(crossGrp.entries.length, 2);
+  assert.deepEqual(crossGrp.sectionIds.sort(), ['sec-general', 'sec-work']);
+
+  const fbFiltered = filterAndSortPasswords(dupList, { sectionId: 'sec-fb', duplicatesOnly: true });
+  assert.equal(fbFiltered.length, 2);
+  const allFiltered = filterAndSortPasswords(dupList, { sectionId: 'all', duplicatesOnly: true });
+  assert.equal(allFiltered.length, 4);
 });
 
 await test('Import/Export & Sync: .vault, Bitwarden JSON, Chrome CSV, and encrypted Sync merge', async () => {

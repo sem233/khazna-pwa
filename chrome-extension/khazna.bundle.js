@@ -4574,10 +4574,15 @@
       dupReasonUser: "\u0646\u0641\u0633 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645/\u0627\u0644\u0631\u0642\u0645",
       dupReasonPass: "\u0646\u0641\u0633 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631",
       dupReasonTitle: "\u0646\u0641\u0633 \u0627\u0644\u0639\u0646\u0648\u0627\u0646",
-      dupBannerSection: "\u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u0643\u0631\u0631\u0629 \u062F\u0627\u062E\u0644 \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0645 \u2014 \u064A\u0645\u0643\u0646\u0643 \u062D\u0630\u0641 \u0627\u0644\u0632\u0627\u0626\u062F \u0645\u0628\u0627\u0634\u0631\u0629 \u0645\u0646 \u0632\u0631 \u0627\u0644\u062D\u0630\u0641",
-      dupBannerAll: "\u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u0643\u0631\u0631\u0629 \u0641\u0639\u0644\u064A\u0627\u064B \u062F\u0627\u062E\u0644 \u0643\u0644 \u0642\u0633\u0645 \u0639\u0644\u0649 \u062D\u062F\u0629 \u2014 \u064A\u0645\u0643\u0646\u0643 \u062A\u0646\u0638\u064A\u0641\u0647\u0627 \u0645\u0628\u0627\u0634\u0631\u0629",
-      dupNoneInSection: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0639\u0646\u0627\u0635\u0631 \u0645\u0643\u0631\u0631\u0629 \u0641\u064A \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0645 \u2713",
-      movedToTrashToast: "\u062A\u0645 \u0627\u0644\u0646\u0642\u0644 \u0644\u0644\u0645\u062D\u0630\u0648\u0641\u0627\u062A"
+      dupBannerSection: "\u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u062A\u0637\u0627\u0628\u0642\u0629 \u0641\u064A \u0646\u0641\u0633 \u0627\u0644\u064A\u0648\u0632\u0631 \u0648\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u062F\u0627\u062E\u0644 \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0645 \u2014 \u0627\u062D\u0630\u0641 \u0623\u064A \u0646\u0633\u062E\u0629 \u0628\u0636\u063A\u0637\u0629 \u0648\u0627\u062D\u062F\u0629",
+      dupBannerAll: "\u0643\u0644 \u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u062A\u0637\u0627\u0628\u0642\u0629 \u0641\u064A \u0646\u0641\u0633 \u0627\u0644\u064A\u0648\u0632\u0631 \u0648\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 (\u062D\u062A\u0649 \u0644\u0648 \u0645\u0646 \u0623\u0642\u0633\u0627\u0645 \u0645\u062E\u062A\u0644\u0641\u0629) \u0645\u062C\u0645\u0651\u0639\u0629 \u0628\u062C\u0627\u0646\u0628 \u0628\u0639\u0636\u0647\u0627",
+      dupNoneInSection: "\u0644\u0627 \u062A\u0648\u062C\u062F \u0639\u0646\u0627\u0635\u0631 \u0645\u0643\u0631\u0631\u0629 (\u0628\u0646\u0641\u0633 \u0627\u0644\u064A\u0648\u0632\u0631 \u0648\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631) \u2713",
+      movedToTrashToast: "\u062A\u0645 \u0627\u0644\u0646\u0642\u0644 \u0644\u0644\u0645\u062D\u0630\u0648\u0641\u0627\u062A",
+      dupGroupTitle: "\u0645\u062C\u0645\u0648\u0639\u0629 \u0645\u062A\u0643\u0631\u0631\u0629 (\u0646\u0641\u0633 \u0627\u0644\u064A\u0648\u0632\u0631 \u0648\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631)",
+      dupCrossSectionBadge: "\u0645\u0643\u0631\u0631 \u0628\u064A\u0646 \u0639\u062F\u0629 \u0623\u0642\u0633\u0627\u0645",
+      fromSectionLabel: "\u0645\u0646 \u0642\u0633\u0645:",
+      deleteThisCopyBtn: "\u062D\u0630\u0641 \u0647\u0630\u0647 \u0627\u0644\u0646\u0633\u062E\u0629",
+      keepOneDeleteExtrasBtn: "\u0625\u0628\u0642\u0627\u0621 \u0646\u0633\u062E\u0629 \u0648\u062D\u0630\u0641 \u0627\u0644\u0632\u0627\u0626\u062F"
     },
     en: {
       appName: "Khazna",
@@ -4859,10 +4864,15 @@
       dupReasonUser: "Same User/Number",
       dupReasonPass: "Same Password",
       dupReasonTitle: "Same Title",
-      dupBannerSection: "Duplicates inside this section \u2014 remove extras directly with Delete",
-      dupBannerAll: "Actual per-section duplicates grouped by section \u2014 clean them directly",
-      dupNoneInSection: "No duplicates in this section \u2713",
-      movedToTrashToast: "Moved to Trash"
+      dupBannerSection: "Exact duplicates (same username & password) inside this section \u2014 delete any copy in one tap",
+      dupBannerAll: "All exact duplicates (same username & password), including across different sections, grouped side-by-side",
+      dupNoneInSection: "No exact duplicates (same username & password) \u2713",
+      movedToTrashToast: "Moved to Trash",
+      dupGroupTitle: "Duplicate Group (Same Username & Password)",
+      dupCrossSectionBadge: "Across Multiple Sections",
+      fromSectionLabel: "From section:",
+      deleteThisCopyBtn: "Delete This Copy",
+      keepOneDeleteExtrasBtn: "Keep 1 & Delete Extras"
     }
   };
   function t(lang, key) {
@@ -7737,7 +7747,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     duplicatesOnly = false,
     sortBy = "updated-desc"
   } = {}) {
-    const dupAnalysis = duplicatesOnly ? analyzeSectionDuplicates(entries) : null;
+    const dupAnalysis = duplicatesOnly ? analyzeDuplicateGroups(entries, { scopeSectionId: sectionId }) : null;
     const filtered = entries.filter((entry) => {
       const d = entry.data || {};
       if (sectionId && sectionId !== "all" && d.sectionId !== sectionId) return false;
@@ -7752,12 +7762,10 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       const da = a.data || {};
       const db = b.data || {};
       if (dupAnalysis) {
-        const ia = dupAnalysis.byEntryId.get(a.id);
-        const ib = dupAnalysis.byEntryId.get(b.id);
-        const secCmp = String(ia?.sectionId || "").localeCompare(String(ib?.sectionId || ""));
-        if (secCmp !== 0) return secCmp;
-        const clusterCmp = String(ia?.clusterKey || "").localeCompare(String(ib?.clusterKey || ""));
-        if (clusterCmp !== 0) return clusterCmp;
+        const ka = dupAnalysis.groupKeyByEntryId.get(a.id) || "";
+        const kb = dupAnalysis.groupKeyByEntryId.get(b.id) || "";
+        const grpCmp = ka.localeCompare(kb);
+        if (grpCmp !== 0) return grpCmp;
       }
       if (Boolean(da.favorite) !== Boolean(db.favorite)) {
         return da.favorite ? -1 : 1;
@@ -7775,82 +7783,80 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     });
     return filtered;
   }
-  function analyzeSectionDuplicates(entries) {
-    const bySection = /* @__PURE__ */ new Map();
+  function getExactCredentialKey(entry) {
+    const d = entry?.data || {};
+    const normUser = normalizeSearchText(d.username);
+    const pwd = String(d.password || "");
+    if (!normUser) return null;
+    return `${normUser}\0${pwd}`;
+  }
+  function analyzeDuplicateGroups(entries, { scopeSectionId = "all" } = {}) {
+    const scopedEntries = scopeSectionId && scopeSectionId !== "all" ? entries.filter((e) => (e.data?.sectionId || "uncategorized") === scopeSectionId) : entries;
+    const map = /* @__PURE__ */ new Map();
+    for (const entry of scopedEntries) {
+      const key = getExactCredentialKey(entry);
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(entry);
+    }
+    const groups = [];
+    const duplicateIds = /* @__PURE__ */ new Set();
+    const groupKeyByEntryId = /* @__PURE__ */ new Map();
+    for (const [key, list] of map.entries()) {
+      if (list.length < 2) continue;
+      const sorted = [...list].sort(
+        (a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""))
+      );
+      const sectionIds = [...new Set(sorted.map((e) => e.data?.sectionId || "uncategorized"))];
+      const group = {
+        key,
+        username: sorted[0].data?.username || "",
+        hasPassword: Boolean(sorted[0].data?.password),
+        entries: sorted,
+        sectionIds,
+        isCrossSection: sectionIds.length > 1
+      };
+      groups.push(group);
+      for (const e of sorted) {
+        duplicateIds.add(e.id);
+        groupKeyByEntryId.set(e.id, key);
+      }
+    }
+    groups.sort((a, b) => {
+      if (a.isCrossSection !== b.isCrossSection) return a.isCrossSection ? -1 : 1;
+      return b.entries.length - a.entries.length;
+    });
+    const countBySection = /* @__PURE__ */ new Map();
+    const perSecBuckets = /* @__PURE__ */ new Map();
     for (const entry of entries) {
       const sid = entry.data?.sectionId || "uncategorized";
-      if (!bySection.has(sid)) bySection.set(sid, []);
-      bySection.get(sid).push(entry);
+      const key = getExactCredentialKey(entry);
+      if (!key) continue;
+      const secKey = `${sid}${key}`;
+      if (!perSecBuckets.has(secKey)) perSecBuckets.set(secKey, { sid, count: 0 });
+      perSecBuckets.get(secKey).count++;
     }
-    const byEntryId = /* @__PURE__ */ new Map();
-    const countBySection = /* @__PURE__ */ new Map();
-    const duplicateIds = /* @__PURE__ */ new Set();
-    const registerReason = (entryId, sectionId, reason) => {
-      duplicateIds.add(entryId);
-      let info = byEntryId.get(entryId);
-      if (!info) {
-        info = { sectionId, reasons: [], clusterKey: reason.clusterKey };
-        byEntryId.set(entryId, info);
+    for (const { sid, count } of perSecBuckets.values()) {
+      if (count >= 2) {
+        countBySection.set(sid, (countBySection.get(sid) || 0) + count);
       }
-      if (!info.reasons.some((r) => r.type === reason.type)) {
-        info.reasons.push(reason);
-      }
-    };
-    for (const [sid, list] of bySection.entries()) {
-      const byUser = /* @__PURE__ */ new Map();
-      const byPwd = /* @__PURE__ */ new Map();
-      const byTitle = /* @__PURE__ */ new Map();
-      for (const entry of list) {
-        const d = entry.data || {};
-        const normUser = normalizeSearchText(d.username);
-        const pwd = String(d.password || "");
-        const normTitle = normalizeSearchText(d.title);
-        if (normUser.length >= 2) {
-          if (!byUser.has(normUser)) byUser.set(normUser, []);
-          byUser.get(normUser).push(entry.id);
-        }
-        if (pwd.length >= 3) {
-          if (!byPwd.has(pwd)) byPwd.set(pwd, []);
-          byPwd.get(pwd).push(entry.id);
-        }
-        if (normTitle.length >= 2) {
-          if (!byTitle.has(normTitle)) byTitle.set(normTitle, []);
-          byTitle.get(normTitle).push(entry.id);
-        }
-      }
-      const secDupIds = /* @__PURE__ */ new Set();
-      for (const [key, ids] of byUser.entries()) {
-        if (ids.length > 1) {
-          for (const id of ids) {
-            secDupIds.add(id);
-            registerReason(id, sid, { type: "username", count: ids.length, clusterKey: `1-user:${key}` });
-          }
-        }
-      }
-      for (const [key, ids] of byPwd.entries()) {
-        if (ids.length > 1) {
-          for (const id of ids) {
-            secDupIds.add(id);
-            registerReason(id, sid, { type: "password", count: ids.length, clusterKey: `2-pwd:${key}` });
-          }
-        }
-      }
-      for (const [key, ids] of byTitle.entries()) {
-        if (ids.length > 1) {
-          for (const id of ids) {
-            secDupIds.add(id);
-            registerReason(id, sid, { type: "title", count: ids.length, clusterKey: `3-title:${key}` });
-          }
-        }
-      }
-      if (secDupIds.size > 0) {
-        countBySection.set(sid, secDupIds.size);
-      }
+    }
+    const globalBuckets = /* @__PURE__ */ new Map();
+    for (const entry of entries) {
+      const key = getExactCredentialKey(entry);
+      if (!key) continue;
+      globalBuckets.set(key, (globalBuckets.get(key) || 0) + 1);
+    }
+    let globalTotalCount = 0;
+    for (const cnt of globalBuckets.values()) {
+      if (cnt >= 2) globalTotalCount += cnt;
     }
     return {
-      byEntryId,
-      countBySection,
+      groups,
       duplicateIds,
+      groupKeyByEntryId,
+      countBySection,
+      globalTotalCount,
       totalCount: duplicateIds.size
     };
   }
@@ -9006,8 +9012,9 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       countBySec.set(sid, (countBySec.get(sid) || 0) + 1);
     }
     const sortedSections = [...sections].sort((a, b) => (a.data?.order ?? 0) - (b.data?.order ?? 0));
-    const dupAnalysis = analyzeSectionDuplicates(passwords);
-    const activeDupCount = state.sectionId && state.sectionId !== "all" ? dupAnalysis.countBySection.get(state.sectionId) || 0 : dupAnalysis.totalCount;
+    const activeScope = state.showTrash ? "all" : state.sectionId || "all";
+    const dupAnalysis = analyzeDuplicateGroups(passwords, { scopeSectionId: activeScope });
+    const activeDupCount = dupAnalysis.totalCount;
     const secGrid = el("section", {
       class: "section-grid-equal",
       role: "tablist",
@@ -9028,7 +9035,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
           "div",
           { class: "sec-tile-top" },
           el("span", { class: "sec-tile-name" }, `\u2728 ${t(lang, "totalAccountsKpi")}`),
-          dupAnalysis.totalCount > 0 ? el("span", { class: "sec-tile-dup", title: t(lang, "duplicates") }, `\u26A0 ${dupAnalysis.totalCount}`) : null
+          dupAnalysis.globalTotalCount > 0 ? el("span", { class: "sec-tile-dup", title: t(lang, "duplicates") }, `\u26A0 ${dupAnalysis.globalTotalCount}`) : null
         ),
         el("strong", { class: "sec-tile-num ltr-inline" }, String(passwords.length))
       )
@@ -9310,14 +9317,108 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       );
     }
     const listWrap = el("div", { class: "entry-list", "data-testid": "password-list" });
+    if (!state.showTrash && state.duplicatesOnly) {
+      const visibleGroups = state.query ? dupAnalysis.groups.filter(
+        (grp) => grp.entries.some((e) => {
+          const d = e.data || {};
+          return matchesQuery(state.query, [d.title, d.username, d.notes]);
+        })
+      ) : dupAnalysis.groups;
+      if (visibleGroups.length === 0) {
+        listWrap.appendChild(
+          el(
+            "div",
+            { class: "glass-card empty-state" },
+            svgIcon("check", 36),
+            el("h3", null, t(lang, "dupNoneInSection"))
+          )
+        );
+        container.appendChild(listWrap);
+        return container;
+      }
+      for (const grp of visibleGroups) {
+        const involvedSectionNames = grp.sectionIds.map((sid) => {
+          const s = sectionById.get(sid);
+          return s ? `${s.data?.emoji || "\u{1F4C1}"} ${s.data?.name || ""}` : lang === "en" ? "\u{1F4C1} Uncategorized" : "\u{1F4C1} \u063A\u064A\u0631 \u0645\u0635\u0646\u0651\u0641";
+        }).join(" \u2022 ");
+        const groupCardsGrid = el("div", { class: "dup-group-grid" });
+        for (const entry of grp.entries) {
+          groupCardsGrid.appendChild(
+            buildEntryCard({
+              entry,
+              sectionById,
+              selectedIds,
+              state,
+              session: session2,
+              lang,
+              sortedSections,
+              copyField,
+              isDupComparison: true,
+              onStateChange,
+              onRefresh
+            })
+          );
+        }
+        const keepOneBtn = el(
+          "button",
+          {
+            type: "button",
+            class: "btn btn-sm btn-danger",
+            "data-testid": "dup-keep-one-btn",
+            onClick: async () => {
+              triggerHaptic(16);
+              const extras = grp.entries.slice(1);
+              for (const ex of extras) {
+                await session2.trashRecord(ex.id);
+              }
+              showToast(`${t(lang, "movedToTrashToast")} (${extras.length})`, "info");
+              await onRefresh();
+            }
+          },
+          svgIcon("trash", 14),
+          `${t(lang, "keepOneDeleteExtrasBtn")} (${grp.entries.length - 1})`
+        );
+        const groupBox = el(
+          "section",
+          {
+            class: `dup-group-box ${grp.isCrossSection ? "is-cross-section" : ""}`.trim(),
+            "data-testid": "dup-group-box"
+          },
+          el(
+            "div",
+            { class: "dup-group-head" },
+            el(
+              "div",
+              { class: "dup-group-meta" },
+              el(
+                "div",
+                { class: "dup-group-title-row" },
+                el("span", { class: "vault-dup-tag" }, `\u26A0 ${t(lang, "dupGroupTitle")} (\xD7${grp.entries.length})`),
+                el("span", { class: "dup-group-user ltr-value" }, `\u{1F464} ${grp.username}`)
+              ),
+              grp.isCrossSection ? el(
+                "div",
+                { class: "dup-cross-banner" },
+                `\u{1F500} ${t(lang, "dupCrossSectionBadge")}: ${involvedSectionNames}`
+              ) : null
+            ),
+            keepOneBtn
+          ),
+          groupCardsGrid
+        );
+        listWrap.appendChild(groupBox);
+      }
+      container.appendChild(listWrap);
+      return container;
+    }
     if (visibleEntries.length === 0) {
       listWrap.appendChild(
         el(
           "div",
           { class: "glass-card empty-state" },
-          svgIcon(state.duplicatesOnly ? "check" : "lock", 36),
-          el("h3", null, state.duplicatesOnly ? t(lang, "dupNoneInSection") : t(lang, "emptyPasswords")),
-          state.duplicatesOnly ? null : el("p", null, t(lang, "emptyPasswordsSub"))
+          svgIcon("lock", 36),
+          el("h3", null, t(lang, "emptyPasswords")),
+          el("p", null, t(lang, "emptyPasswordsSub"))
         )
       );
       container.appendChild(listWrap);
@@ -9354,7 +9455,6 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
               lang,
               sortedSections,
               copyField,
-              dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
               onStateChange,
               onRefresh
             })
@@ -9396,7 +9496,6 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
               lang,
               sortedSections,
               copyField,
-              dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
               onStateChange,
               onRefresh
             })
@@ -9439,7 +9538,6 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
             lang,
             sortedSections,
             copyField,
-            dupInfo: dupAnalysis.byEntryId.get(entry.id) || null,
             onStateChange,
             onRefresh
           })
@@ -9459,7 +9557,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     lang,
     sortedSections,
     copyField,
-    dupInfo = null,
+    isDupComparison = false,
     onStateChange,
     onRefresh
   }) {
@@ -9597,16 +9695,16 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
       !state.showTrash && !isSelecting ? el("div", { class: "vault-card-actions" }, favBtn, moveIconBtn, editIconBtn, deleteIconBtn) : null
     );
     card.appendChild(topRow);
-    if (!state.showTrash && state.duplicatesOnly && dupInfo && dupInfo.reasons?.length > 0) {
-      const dupRow = el(
-        "div",
-        { class: "vault-dup-tags" },
-        ...dupInfo.reasons.map((r) => {
-          const label = r.type === "username" ? t(lang, "dupReasonUser") : r.type === "password" ? t(lang, "dupReasonPass") : t(lang, "dupReasonTitle");
-          return el("span", { class: "vault-dup-tag" }, `\u26A0 ${label} (\xD7${r.count})`);
-        })
+    if (!state.showTrash && isDupComparison) {
+      const originName = sec ? `${sec.data?.emoji || "\u{1F4C1}"} ${sec.data?.name || ""}` : lang === "en" ? "\u{1F4C1} Uncategorized" : "\u{1F4C1} \u063A\u064A\u0631 \u0645\u0635\u0646\u0651\u0641";
+      card.appendChild(
+        el(
+          "div",
+          { class: "vault-origin-badge", "data-testid": "dup-origin-badge" },
+          el("span", { class: "vault-origin-label" }, t(lang, "fromSectionLabel")),
+          el("strong", { class: "vault-origin-name" }, originName)
+        )
       );
-      card.appendChild(dupRow);
     }
     if (state.showTrash) {
       card.appendChild(
@@ -9727,6 +9825,26 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
     }
     if (rowsWrap.childNodes.length > 0) {
       card.appendChild(rowsWrap);
+    }
+    if (isDupComparison && !state.showTrash && !isSelecting) {
+      card.appendChild(
+        el(
+          "button",
+          {
+            type: "button",
+            class: "btn btn-sm btn-danger btn-block vault-dup-delete-btn",
+            "data-testid": "dup-delete-copy-btn",
+            onClick: async () => {
+              triggerHaptic(14);
+              await session2.trashRecord(entry.id);
+              showToast(`${t(lang, "movedToTrashToast")}: ${d.title || ""}`, "info");
+              await onRefresh();
+            }
+          },
+          svgIcon("trash", 14),
+          t(lang, "deleteThisCopyBtn")
+        )
+      );
     }
     return card;
   }
@@ -10589,7 +10707,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
         "div",
         { class: "settings-row" },
         el("span", { class: "settings-row-title" }, t(lang, "appVersionLabel")),
-        el("span", { class: "settings-row-desc ltr-inline mono" }, `v${integrityInfo?.version || "2.6.0"} \u2022 ${kdfInfo}`)
+        el("span", { class: "settings-row-desc ltr-inline mono" }, `v${integrityInfo?.version || "2.7.0"} \u2022 ${kdfInfo}`)
       )
     );
     pwaCard.appendChild(
@@ -12377,7 +12495,7 @@ ${n.checklist.map((i) => `${i.done ? "[x]" : "[ ]"} ${i.text}`).join("\n")}`.tri
   }
 
   // src/main.js
-  var APP_VERSION = "2.6.0";
+  var APP_VERSION = "2.7.0";
   function isCapacitorAndroid() {
     return typeof window !== "undefined" && typeof window.Capacitor !== "undefined" && window.Capacitor?.isNativePlatform?.() === true && window.Capacitor?.getPlatform?.() === "android";
   }
